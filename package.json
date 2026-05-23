@@ -1,0 +1,20 @@
+{
+  "name": "paws-racing",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Online voxel arcade racer with SNES-era feel.",
+  "packageManager": "pnpm@9.15.5",
+  "scripts": {
+    "dev": "pnpm -r --parallel --stream run dev",
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "lint": "biome check .",
+    "format": "biome format --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

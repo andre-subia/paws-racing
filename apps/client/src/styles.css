@@ -1,0 +1,20 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #0b0418;
+  color: #f7f1ff;
+  font-family: 'VT323', 'Press Start 2P', monospace;
+  overflow: hidden;
+}
+
+canvas {
+  display: block;
+}
