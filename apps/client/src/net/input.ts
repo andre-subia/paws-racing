@@ -1,5 +1,6 @@
 import { INPUT_FLAGS, SIM_HZ } from '@paws/shared';
 import type { Room } from 'colyseus.js';
+import type { PredictionController } from './prediction.ts';
 
 const KEY_MAP: Record<string, number> = {
   KeyW: INPUT_FLAGS.THROTTLE,
@@ -20,11 +21,10 @@ export interface InputController {
 }
 
 /**
- * Samples keyboard at SIM_HZ and sends `input` messages to the room with
- * monotonically increasing seq numbers. No client-side prediction yet; that
- * lands in Week 2.
+ * Samples keyboard at SIM_HZ, drives client-side prediction locally, and
+ * sends the same inputs to the room with monotonic seq numbers.
  */
-export function startInputLoop(room: Room): InputController {
+export function startInputLoop(room: Room, prediction: PredictionController): InputController {
   const pressed = new Set<string>();
   let seq = 0;
   let tick = 0;
@@ -32,7 +32,6 @@ export function startInputLoop(room: Room): InputController {
   const onDown = (e: KeyboardEvent) => {
     if (KEY_MAP[e.code] !== undefined) {
       pressed.add(e.code);
-      // Avoid scrolling on arrows / space.
       e.preventDefault();
     }
   };
@@ -47,6 +46,7 @@ export function startInputLoop(room: Room): InputController {
     for (const code of pressed) flags |= KEY_MAP[code] ?? 0;
     seq += 1;
     tick += 1;
+    prediction.applyInput(seq, flags);
     room.send('input', { seq, tick, flags });
   }, 1000 / SIM_HZ);
 

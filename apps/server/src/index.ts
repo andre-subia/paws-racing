@@ -4,9 +4,9 @@ import { WebSocketTransport } from '@colyseus/ws-transport';
 import express from 'express';
 import { createServer } from 'node:http';
 import { ROOM_NAMES } from '@paws/shared';
-import { config } from './config.ts';
-import { logger } from './logger.ts';
-import { RaceRoom } from './rooms/RaceRoom.ts';
+import { config } from './config.js';
+import { logger } from './logger.js';
+import { RaceRoom } from './rooms/RaceRoom.js';
 
 const app = express();
 
@@ -22,7 +22,7 @@ const gameServer = new Server({
   transport: new WebSocketTransport({ server: httpServer }),
 });
 
-gameServer.define(ROOM_NAMES.RACE, RaceRoom);
+gameServer.define(ROOM_NAMES.RACE, RaceRoom).filterBy(['code']);
 
 gameServer
   .listen(config.port)

@@ -2,14 +2,21 @@ import type { VehicleId } from '@paws/shared';
 import { create } from 'zustand';
 
 export type Scene = 'menu' | 'race';
+export type JoinIntent =
+  | { kind: 'quick' }
+  | { kind: 'create' }
+  | { kind: 'join'; code: string };
 
 interface GameStore {
   scene: Scene;
   name: string;
   vehicle: VehicleId;
+  joinIntent: JoinIntent | null;
   setScene: (s: Scene) => void;
   setName: (n: string) => void;
   setVehicle: (v: VehicleId) => void;
+  startRace: (intent: JoinIntent) => void;
+  endRace: () => void;
 }
 
 const stored = (key: string, fallback: string) =>
@@ -19,6 +26,7 @@ export const useGame = create<GameStore>((set) => ({
   scene: 'menu',
   name: stored('paws.name', 'Racer'),
   vehicle: (stored('paws.vehicle', 'scout') as VehicleId) ?? 'scout',
+  joinIntent: null,
   setScene: (scene) => set({ scene }),
   setName: (name) => {
     window.localStorage.setItem('paws.name', name);
@@ -28,4 +36,6 @@ export const useGame = create<GameStore>((set) => ({
     window.localStorage.setItem('paws.vehicle', vehicle);
     set({ vehicle });
   },
+  startRace: (intent) => set({ scene: 'race', joinIntent: intent }),
+  endRace: () => set({ scene: 'menu', joinIntent: null }),
 }));

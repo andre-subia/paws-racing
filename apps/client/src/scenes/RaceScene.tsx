@@ -1,50 +1,99 @@
-import type { PlayerState, RaceState } from '@paws/shared';
+import type { PlayerState, RaceState, VehicleId } from '@paws/shared';
 import { Environment, Grid } from '@react-three/drei';
-import { Canvas } from '@react-three/fiber';
-import type { Room } from 'colyseus.js';
-import { useEffect, useState } from 'react';
-import { ChaseCamera } from '../game/Camera.tsx';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { type Room, getStateCallbacks } from 'colyseus.js';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { type CameraTarget, ChaseCamera } from '../game/Camera.tsx';
 import { Vehicle } from '../game/Vehicle.tsx';
-import { joinRace } from '../net/client.ts';
+import { createRoom, joinByCode, quickRace } from '../net/client.ts';
 import { type InputController, startInputLoop } from '../net/input.ts';
+import { type InterpolatedPose, RemoteInterpolator } from '../net/interpolation.ts';
+import { PredictionController } from '../net/prediction.ts';
 import { useGame } from '../store/game.ts';
 import { Hud } from '../ui/Hud.tsx';
+import { LobbyPanel } from '../ui/LobbyPanel.tsx';
 
 type ConnState = 'connecting' | 'connected' | 'error' | 'disconnected';
 
+interface SceneContext {
+  room: Room<RaceState>;
+  prediction: PredictionController;
+  interpolator: RemoteInterpolator;
+}
+
 export function RaceScene() {
-  const { name, vehicle, setScene } = useGame();
-  const [room, setRoom] = useState<Room<RaceState> | null>(null);
+  const { name, vehicle, joinIntent, setVehicle, endRace } = useGame();
+  const [ctx, setCtx] = useState<SceneContext | null>(null);
   const [conn, setConn] = useState<ConnState>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [, force] = useState(0);
 
-  // Connect on mount.
+  const predictionRef = useRef<PredictionController>(new PredictionController());
+  const interpolatorRef = useRef<RemoteInterpolator>(new RemoteInterpolator());
+  const cameraTargetRef = useRef<CameraTarget | null>(null);
+
   useEffect(() => {
+    if (!joinIntent) return;
     let cancelled = false;
     let inputCtrl: InputController | null = null;
     let activeRoom: Room<RaceState> | null = null;
 
     (async () => {
       try {
-        const r = await joinRace({ name, vehicle });
+        predictionRef.current = new PredictionController();
+        interpolatorRef.current = new RemoteInterpolator();
+        predictionRef.current.setVehicle(vehicle);
+
+        let room: Room<RaceState>;
+        switch (joinIntent.kind) {
+          case 'quick':
+            room = await quickRace({ name, vehicle });
+            break;
+          case 'create':
+            room = await createRoom({ name, vehicle });
+            break;
+          case 'join':
+            room = await joinByCode({ name, vehicle, code: joinIntent.code });
+            break;
+        }
+
         if (cancelled) {
-          r.leave();
+          room.leave();
           return;
         }
-        activeRoom = r;
-        setRoom(r);
+        activeRoom = room;
         setConn('connected');
 
-        // Force a render on every state patch (cheap because Three is imperative).
-        r.onStateChange(() => force((n) => n + 1));
-        r.onLeave(() => setConn('disconnected'));
-        r.onError((_code, msg) => {
+        const prediction = predictionRef.current;
+        const interpolator = interpolatorRef.current;
+
+        room.onStateChange((state) => {
+          for (const player of state.players.values()) {
+            if (player.id === room.sessionId) {
+              const v = player.vehicle === 'bruiser' ? 'bruiser' : 'scout';
+              prediction.setVehicle(v);
+              prediction.onSnapshot(player);
+            } else {
+              interpolator.pushFromSchema(player);
+            }
+          }
+          force((n) => n + 1);
+        });
+
+        const $ = getStateCallbacks(room);
+        $(room.state).players.onRemove((_player, key) => {
+          if (key !== room.sessionId) interpolator.drop(key);
+        });
+
+        room.onLeave(() => setConn('disconnected'));
+        room.onError((_code, msg) => {
           setError(msg ?? 'room error');
           setConn('error');
         });
 
-        inputCtrl = startInputLoop(r);
+        inputCtrl = startInputLoop(room, prediction);
+
+        setCtx({ room, prediction, interpolator });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setConn('error');
@@ -56,10 +105,19 @@ export function RaceScene() {
       inputCtrl?.stop();
       activeRoom?.leave();
     };
-  }, [name, vehicle]);
+  }, [name, vehicle, joinIntent]);
 
-  const players: PlayerState[] = room ? Array.from(room.state.players.values()) : [];
-  const localPlayer = room ? room.state.players.get(room.sessionId) : undefined;
+  const room = ctx?.room;
+  const phase = (room?.state.phase ?? 'waiting') as 'waiting' | 'countdown' | 'racing' | 'finished';
+
+  const playersArr = useMemo(
+    () => (room ? Array.from(room.state.players.values()) : []),
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-derive on every forced render
+    [room, room?.state.players.size, ctx, phase],
+  );
+
+  const localPlayer = room?.state.players.get(room.sessionId);
+  const isHost = !!localPlayer?.host;
 
   return (
     <>
@@ -81,7 +139,6 @@ export function RaceScene() {
         />
         <Environment preset="night" />
 
-        {/* Placeholder ground until W3 track lands. */}
         <Grid
           args={[200, 200]}
           cellColor="#42f5e0"
@@ -91,20 +148,53 @@ export function RaceScene() {
           position={[0, 0, 0]}
         />
 
-        {players.map((p) => (
-          <Vehicle key={p.id} player={p} isLocal={p.id === room?.sessionId} />
-        ))}
+        {ctx && (
+          <SceneRenderer
+            players={playersArr}
+            localSid={ctx.room.sessionId}
+            prediction={ctx.prediction}
+            interpolator={ctx.interpolator}
+            cameraTargetRef={cameraTargetRef}
+            phase={phase}
+          />
+        )}
 
-        <ChaseCamera player={localPlayer} />
+        <ChaseCamera targetRef={cameraTargetRef} />
       </Canvas>
 
-      <Hud
-        status={conn === 'connected' ? 'CONNECTED' : conn.toUpperCase()}
-        speed={localPlayer?.speed ?? 0}
-        roomCode={room?.state.code}
-        players={players.length}
-        onLeave={() => setScene('menu')}
-      />
+      {room && phase !== 'racing' && (
+        <LobbyPanel
+          code={room.state.code}
+          players={playersArr.map((p) => ({
+            id: p.id,
+            name: p.name,
+            vehicle: p.vehicle,
+            ready: p.ready,
+            host: p.host,
+          }))}
+          localSid={room.sessionId}
+          isHost={isHost}
+          countdownEndsAt={room.state.countdownEndsAt}
+          phase={phase}
+          onToggleReady={() => room.send('ready', {})}
+          onPickVehicle={(v) => {
+            setVehicle(v);
+            room.send('vehicle', { vehicle: v });
+          }}
+          onStart={() => room.send('start', {})}
+          onLeave={endRace}
+        />
+      )}
+
+      {phase === 'racing' && (
+        <Hud
+          status={conn === 'connected' ? 'RACING' : conn.toUpperCase()}
+          speed={ctx?.prediction.getState().speed ?? 0}
+          roomCode={room?.state.code}
+          players={playersArr.length}
+          onLeave={endRace}
+        />
+      )}
 
       {error && (
         <div className="absolute inset-x-0 top-0 bg-red-600/80 px-4 py-2 text-center text-white">
@@ -113,4 +203,95 @@ export function RaceScene() {
       )}
     </>
   );
+}
+
+interface RendererProps {
+  players: PlayerState[];
+  localSid: string;
+  prediction: PredictionController;
+  interpolator: RemoteInterpolator;
+  cameraTargetRef: { current: CameraTarget | null };
+  phase: 'waiting' | 'countdown' | 'racing' | 'finished';
+}
+
+const _pose: InterpolatedPose = { x: 0, y: 0, z: 0, yaw: 0, drifting: false };
+
+function SceneRenderer({
+  players,
+  localSid,
+  prediction,
+  interpolator,
+  cameraTargetRef,
+  phase,
+}: RendererProps) {
+  const poses = useRef(new Map<string, InterpolatedPose>());
+
+  useFrame(() => {
+    for (const p of players) {
+      let pose = poses.current.get(p.id);
+      if (!pose) {
+        pose = { x: 0, y: 0.5, z: 0, yaw: 0, drifting: false };
+        poses.current.set(p.id, pose);
+      }
+      if (p.id === localSid) {
+        // Use prediction only during active racing; otherwise track schema
+        // directly so countdown / lobby spawns don't drift.
+        if (phase === 'racing') {
+          const s = prediction.getState();
+          pose.x = s.x;
+          pose.y = s.y;
+          pose.z = s.z;
+          pose.yaw = s.yaw;
+          pose.drifting = s.drifting;
+        } else {
+          pose.x = p.position.x;
+          pose.y = p.position.y;
+          pose.z = p.position.z;
+          pose.yaw = quatYaw(p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w);
+          pose.drifting = p.drifting;
+        }
+        if (!cameraTargetRef.current) cameraTargetRef.current = { x: 0, y: 0, z: 0, yaw: 0 };
+        cameraTargetRef.current.x = pose.x;
+        cameraTargetRef.current.y = pose.y;
+        cameraTargetRef.current.z = pose.z;
+        cameraTargetRef.current.yaw = pose.yaw;
+      } else {
+        if (interpolator.sample(p.id, _pose)) {
+          pose.x = _pose.x;
+          pose.y = _pose.y;
+          pose.z = _pose.z;
+          pose.yaw = _pose.yaw;
+          pose.drifting = _pose.drifting;
+        }
+      }
+    }
+  });
+
+  return (
+    <>
+      {players.map((p) => {
+        const pose = poses.current.get(p.id) ?? { x: 0, y: 0.5, z: 0, yaw: 0, drifting: false };
+        const isLocal = p.id === localSid;
+        const color = isLocal ? '#42f5e0' : p.vehicle === 'bruiser' ? '#ff3aa3' : '#ffb142';
+        return (
+          <Vehicle
+            key={p.id}
+            x={pose.x}
+            y={pose.y}
+            z={pose.z}
+            yaw={pose.yaw}
+            color={color}
+            snap={isLocal && phase === 'racing'}
+            drifting={pose.drifting}
+          />
+        );
+      })}
+    </>
+  );
+}
+
+function quatYaw(x: number, y: number, z: number, w: number): number {
+  const siny_cosp = 2 * (w * y + x * z);
+  const cosy_cosp = 1 - 2 * (y * y + x * x);
+  return Math.atan2(siny_cosp, cosy_cosp);
 }
