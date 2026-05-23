@@ -1,9 +1,10 @@
-import type { PlayerState, RaceState, VehicleId } from '@paws/shared';
-import { Environment, Grid } from '@react-three/drei';
+import { type PlayerState, type RaceState, getTrack } from '@paws/shared';
+import { Environment } from '@react-three/drei';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { type Room, getStateCallbacks } from 'colyseus.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type CameraTarget, ChaseCamera } from '../game/Camera.tsx';
+import { Track } from '../game/Track.tsx';
 import { Vehicle } from '../game/Vehicle.tsx';
 import { createRoom, joinByCode, quickRace } from '../net/client.ts';
 import { type InputController, startInputLoop } from '../net/input.ts';
@@ -12,6 +13,7 @@ import { PredictionController } from '../net/prediction.ts';
 import { useGame } from '../store/game.ts';
 import { Hud } from '../ui/Hud.tsx';
 import { LobbyPanel } from '../ui/LobbyPanel.tsx';
+import { Results } from '../ui/Results.tsx';
 
 type ConnState = 'connecting' | 'connected' | 'error' | 'disconnected';
 
@@ -109,6 +111,8 @@ export function RaceScene() {
 
   const room = ctx?.room;
   const phase = (room?.state.phase ?? 'waiting') as 'waiting' | 'countdown' | 'racing' | 'finished';
+  const trackId = room?.state.trackId ?? 'neo_kibble_city';
+  const track = useMemo(() => getTrack(trackId), [trackId]);
 
   const playersArr = useMemo(
     () => (room ? Array.from(room.state.players.values()) : []),
@@ -123,30 +127,24 @@ export function RaceScene() {
     <>
       <Canvas
         shadows
-        camera={{ position: [0, 4, 10], fov: 60 }}
+        camera={{ position: [0, 6, 18], fov: 60 }}
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         dpr={[1, 1.5]}
       >
-        <color attach="background" args={['#1a0a3a']} />
-        <fog attach="fog" args={['#1a0a3a', 30, 140]} />
+        <color attach="background" args={['#0b0418']} />
+        <fog attach="fog" args={['#0b0418', 80, 220]} />
 
-        <ambientLight intensity={0.4} />
+        <ambientLight intensity={0.4} color="#5a3aa0" />
         <directionalLight
-          position={[20, 30, 10]}
-          intensity={1.2}
+          position={[40, 60, 20]}
+          intensity={1.1}
           castShadow
           shadow-mapSize={[1024, 1024]}
         />
+        <hemisphereLight args={['#ff7ed3', '#1a0a3a', 0.4]} />
         <Environment preset="night" />
 
-        <Grid
-          args={[200, 200]}
-          cellColor="#42f5e0"
-          sectionColor="#9b59ff"
-          fadeDistance={120}
-          infiniteGrid
-          position={[0, 0, 0]}
-        />
+        <Track track={track} />
 
         {ctx && (
           <SceneRenderer
@@ -162,7 +160,7 @@ export function RaceScene() {
         <ChaseCamera targetRef={cameraTargetRef} />
       </Canvas>
 
-      {room && phase !== 'racing' && (
+      {room && phase === 'waiting' && (
         <LobbyPanel
           code={room.state.code}
           players={playersArr.map((p) => ({
@@ -186,12 +184,41 @@ export function RaceScene() {
         />
       )}
 
-      {phase === 'racing' && (
+      {room && phase === 'countdown' && (
+        <LobbyPanel
+          code={room.state.code}
+          players={[]}
+          localSid={room.sessionId}
+          isHost={isHost}
+          countdownEndsAt={room.state.countdownEndsAt}
+          phase={phase}
+          onToggleReady={() => undefined}
+          onPickVehicle={() => undefined}
+          onStart={() => undefined}
+          onLeave={endRace}
+        />
+      )}
+
+      {phase === 'racing' && room && localPlayer && (
         <Hud
-          status={conn === 'connected' ? 'RACING' : conn.toUpperCase()}
-          speed={ctx?.prediction.getState().speed ?? 0}
-          roomCode={room?.state.code}
+          status="RACING"
+          speed={ctx?.prediction.getState().speed ?? localPlayer.speed}
+          roomCode={room.state.code}
           players={playersArr.length}
+          lap={localPlayer.lap}
+          checkpoint={localPlayer.checkpoint}
+          totalCheckpoints={track.checkpoints.length}
+          rank={localPlayer.position_rank}
+          boostUntil={localPlayer.boostUntil}
+          serverTime={room.state.serverTime}
+          onLeave={endRace}
+        />
+      )}
+
+      {phase === 'finished' && room && (
+        <Results
+          raceStartedAt={room.state.countdownEndsAt}
+          rows={buildResults(playersArr, room.sessionId, room.state)}
           onLeave={endRace}
         />
       )}
@@ -203,6 +230,36 @@ export function RaceScene() {
       )}
     </>
   );
+}
+
+function buildResults(
+  players: PlayerState[],
+  localSid: string,
+  state: RaceState,
+): Array<{ rank: number; name: string; finishedAt: number; isLocal: boolean; vehicle: string }> {
+  // Finished players in order; then unfinished sorted by lap+checkpoint descending.
+  const finishedIds = Array.from(state.finishOrder);
+  const finished = finishedIds.map((id, i) => {
+    const p = players.find((pp) => pp.id === id);
+    return {
+      rank: i + 1,
+      name: p?.name ?? '???',
+      finishedAt: p?.finishedAt ?? 0,
+      isLocal: id === localSid,
+      vehicle: p?.vehicle ?? '',
+    };
+  });
+  const unfinishedSorted = players
+    .filter((p) => p.finishedAt === 0)
+    .sort((a, b) => b.lap * 100 + b.checkpoint - (a.lap * 100 + a.checkpoint));
+  const unfinished = unfinishedSorted.map((p, i) => ({
+    rank: finished.length + i + 1,
+    name: p.name,
+    finishedAt: 0,
+    isLocal: p.id === localSid,
+    vehicle: p.vehicle,
+  }));
+  return [...finished, ...unfinished];
 }
 
 interface RendererProps {
@@ -234,8 +291,6 @@ function SceneRenderer({
         poses.current.set(p.id, pose);
       }
       if (p.id === localSid) {
-        // Use prediction only during active racing; otherwise track schema
-        // directly so countdown / lobby spawns don't drift.
         if (phase === 'racing') {
           const s = prediction.getState();
           pose.x = s.x;

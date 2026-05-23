@@ -4,25 +4,34 @@ import {
   BROADCAST_DT,
   COUNTDOWN_MS,
   emptyBikeState,
+  getTrack,
   type InputCommand,
   LAPS_PER_RACE,
   MAX_PLAYERS_PER_ROOM,
   PlayerState,
   RaceState,
-  SIM_DT,
   SIM_HZ,
   stepBike,
+  type TrackDef,
   VEHICLES,
   type VehicleId,
   yawToQuat,
 } from '@paws/shared';
 import { generateCode, normalizeCode } from '../codes.js';
 import { logger } from '../logger.js';
+import {
+  advanceCheckpoint,
+  type BoostCooldowns,
+  type GateMemory,
+  resolveBikeCollisions,
+  tickBoostPads,
+} from '../sim/race.js';
 
 interface JoinOptions {
   name?: string;
   vehicle?: VehicleId;
   code?: string;
+  trackId?: string;
 }
 
 interface PendingInput {
@@ -30,29 +39,33 @@ interface PendingInput {
   flags: number;
 }
 
-/**
- * Unified lobby + race room. Phases: waiting → countdown → racing → finished.
- * Solo-MVP simplification vs. the original plan's two-room split — one state
- * machine in one room is materially simpler to ship.
- */
+const FINISH_HOLD_MS = 4000;
+
 export class RaceRoom extends Room<RaceState> {
   override maxClients = MAX_PLAYERS_PER_ROOM;
   override autoDispose = true;
 
   private inputQueue = new Map<string, PendingInput[]>();
   private bikeStates = new Map<string, BikeState>();
+  private gateMem = new Map<string, GateMemory>();
+  private boostCooldowns = new Map<string, BoostCooldowns>();
+
+  private track!: TrackDef;
+  private finishedAt = 0; // serverTime when race finished, for hold-then-reset
 
   override onCreate(options: JoinOptions) {
     this.setState(new RaceState());
     const requestedCode = options.code ? normalizeCode(options.code) : '';
     this.state.code = requestedCode || generateCode();
-    // Persisted on the room metadata so filterBy can match join-by-code.
     this.setMetadata({ code: this.state.code });
+
+    this.track = getTrack(options.trackId ?? this.state.trackId);
+    this.state.trackId = this.track.id;
 
     this.setPatchRate(1000 * BROADCAST_DT);
 
     this.onMessage('input', (client, msg: InputCommand) => {
-      if (this.state.phase !== 'racing' && this.state.phase !== 'countdown') return;
+      if (this.state.phase !== 'racing') return;
       const queue = this.inputQueue.get(client.sessionId);
       if (!queue) return;
       const last = queue.at(-1);
@@ -100,9 +113,17 @@ export class RaceRoom extends Room<RaceState> {
     if (player.host) this.state.hostId = client.sessionId;
 
     const slot = this.state.players.size;
+    const spawn =
+      this.track.spawnPoints[slot] ??
+      this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
     const bike = emptyBikeState();
-    bike.x = (slot - (MAX_PLAYERS_PER_ROOM - 1) / 2) * 2.5;
+    bike.x = spawn.x;
+    bike.y = this.track.surfaceY + 0.5;
+    bike.z = spawn.z;
+    bike.yaw = spawn.yaw;
     this.bikeStates.set(client.sessionId, bike);
+    this.gateMem.set(client.sessionId, { lastSignedDist: -1 });
+    this.boostCooldowns.set(client.sessionId, new Map());
 
     syncToSchema(bike, player);
     this.state.players.set(client.sessionId, player);
@@ -147,6 +168,8 @@ export class RaceRoom extends Room<RaceState> {
     this.state.players.delete(sid);
     this.inputQueue.delete(sid);
     this.bikeStates.delete(sid);
+    this.gateMem.delete(sid);
+    this.boostCooldowns.delete(sid);
     if (this.state.hostId === sid) {
       const next = this.state.players.keys().next().value as string | undefined;
       this.state.hostId = next ?? '';
@@ -164,14 +187,19 @@ export class RaceRoom extends Room<RaceState> {
   private startCountdown() {
     this.state.phase = 'countdown';
     this.state.countdownEndsAt = Date.now() + COUNTDOWN_MS;
-    // Reset positions to the starting grid in case people moved around.
+    this.state.finishOrder.clear();
+    this.finishedAt = 0;
+
     let slot = 0;
     for (const [sid, player] of this.state.players) {
+      const spawn =
+        this.track.spawnPoints[slot] ??
+        this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
       const bike = this.bikeStates.get(sid) ?? emptyBikeState();
-      bike.x = (slot - (this.state.players.size - 1) / 2) * 2.5;
-      bike.y = 0.5;
-      bike.z = 0;
-      bike.yaw = 0;
+      bike.x = spawn.x;
+      bike.y = this.track.surfaceY + 0.5;
+      bike.z = spawn.z;
+      bike.yaw = spawn.yaw;
       bike.vx = 0;
       bike.vz = 0;
       bike.speed = 0;
@@ -181,9 +209,40 @@ export class RaceRoom extends Room<RaceState> {
       player.lap = 0;
       player.checkpoint = -1;
       player.finishedAt = 0;
+      player.position_rank = 0;
+      player.boostUntil = 0;
+      player.boostSpeed = 0;
+      this.gateMem.set(sid, { lastSignedDist: -1 });
+      this.boostCooldowns.set(sid, new Map());
       slot += 1;
     }
-    logger.info({ room: this.roomId, code: this.state.code }, 'countdown started');
+    logger.info(
+      { room: this.roomId, code: this.state.code, track: this.track.id },
+      'countdown started',
+    );
+  }
+
+  private finishRace() {
+    this.state.phase = 'finished';
+    this.finishedAt = Date.now();
+    logger.info({ room: this.roomId, code: this.state.code }, 'race finished');
+  }
+
+  private resetToLobby() {
+    this.state.phase = 'waiting';
+    this.state.countdownEndsAt = 0;
+    this.state.finishOrder.clear();
+    for (const [sid, p] of this.state.players) {
+      p.ready = false;
+      p.lap = 0;
+      p.checkpoint = -1;
+      p.finishedAt = 0;
+      p.position_rank = 0;
+      p.boostUntil = 0;
+      p.boostSpeed = 0;
+      this.gateMem.set(sid, { lastSignedDist: -1 });
+      this.boostCooldowns.set(sid, new Map());
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -192,29 +251,36 @@ export class RaceRoom extends Room<RaceState> {
 
   private tick(dt: number) {
     this.state.tick += 1;
-    this.state.serverTime = Date.now();
+    const now = Date.now();
+    this.state.serverTime = now;
 
-    if (this.state.phase === 'countdown' && this.state.serverTime >= this.state.countdownEndsAt) {
+    // Phase transitions
+    if (this.state.phase === 'countdown' && now >= this.state.countdownEndsAt) {
       this.state.phase = 'racing';
       logger.info({ room: this.roomId, code: this.state.code }, 'race started');
     }
+    if (this.state.phase === 'finished' && now - this.finishedAt > FINISH_HOLD_MS) {
+      this.resetToLobby();
+    }
 
     if (this.state.phase !== 'racing' && this.state.phase !== 'countdown') {
-      // Drain stale input queues (e.g. from disconnects mid-state-transition).
       for (const q of this.inputQueue.values()) q.length = 0;
       return;
     }
 
-    // Inputs are accepted in 'racing' only — during countdown the bike sits still.
     const acceptInputs = this.state.phase === 'racing';
 
+    // Step each player.
     for (const [sid, player] of this.state.players) {
       const bike = this.bikeStates.get(sid);
       if (!bike) continue;
-      const spec = VEHICLES[(player.vehicle as VehicleId) in VEHICLES ? (player.vehicle as VehicleId) : 'scout'];
+      const spec =
+        VEHICLES[
+          (player.vehicle as VehicleId) in VEHICLES ? (player.vehicle as VehicleId) : 'scout'
+        ];
       const queue = this.inputQueue.get(sid);
 
-      if (!acceptInputs || !queue || queue.length === 0) {
+      if (!acceptInputs || player.finishedAt > 0 || !queue || queue.length === 0) {
         stepBike(bike, 0, dt, spec);
       } else {
         const n = queue.length;
@@ -226,11 +292,57 @@ export class RaceRoom extends Room<RaceState> {
         }
       }
 
-      syncToSchema(bike, player);
+      // Boost: while active, hold speed at the boost target.
+      if (now < player.boostUntil) {
+        if (bike.speed < player.boostSpeed) bike.speed = player.boostSpeed;
+      } else if (player.boostUntil !== 0) {
+        player.boostUntil = 0;
+        player.boostSpeed = 0;
+      }
     }
 
-    for (const p of this.state.players.values()) {
-      if (p.lap > LAPS_PER_RACE) p.lap = LAPS_PER_RACE;
+    // Vehicle-vehicle collision (only during active race).
+    if (acceptInputs) {
+      resolveBikeCollisions(Array.from(this.bikeStates.keys()), this.bikeStates);
+    }
+
+    // Checkpoints + laps + boost-pad triggers (race only).
+    if (acceptInputs) {
+      for (const [sid, player] of this.state.players) {
+        const bike = this.bikeStates.get(sid);
+        const mem = this.gateMem.get(sid);
+        if (!bike || !mem) continue;
+
+        const result = advanceCheckpoint(this.track, player, bike, mem, LAPS_PER_RACE, now);
+        if (result.finished) {
+          this.state.finishOrder.push(player.id);
+          player.position_rank = this.state.finishOrder.length;
+        }
+
+        // Boost pads.
+        const cd = this.boostCooldowns.get(sid);
+        if (cd) {
+          const hit = tickBoostPads(this.track, bike, cd, now);
+          if (hit) {
+            player.boostUntil = hit.until;
+            player.boostSpeed = hit.pad.speed;
+          }
+        }
+      }
+    }
+
+    // Sync schema for everyone.
+    for (const [sid, player] of this.state.players) {
+      const bike = this.bikeStates.get(sid);
+      if (bike) syncToSchema(bike, player);
+    }
+
+    // If everyone has finished, end the race.
+    if (acceptInputs) {
+      const players = Array.from(this.state.players.values());
+      if (players.length > 0 && players.every((p) => p.finishedAt > 0)) {
+        this.finishRace();
+      }
     }
   }
 }

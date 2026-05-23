@@ -37,6 +37,10 @@ export class PlayerState extends Schema {
   @type('number') checkpoint = -1;
   @type('number') finishedAt = 0;
   @type('number') position_rank = 0;
+
+  // Boost state (set by server when a boost pad triggers)
+  @type('number') boostUntil = 0;
+  @type('number') boostSpeed = 0;
 }
 
 export class RaceState extends Schema {
