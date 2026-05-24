@@ -21,6 +21,9 @@ export interface SpriteAtlas {
   /** Single body texture per vehicle id. */
   bikes: Record<string, Texture>;
   tile: Texture;
+  /** Off-track filler tile (64×64 iso block), placed in the bounding box
+   * around the racing line so the world has visual context. */
+  grassTile: Texture;
   whiteTile: Texture;
   boostTile: Texture;
   checkpointMarker: Texture;
@@ -56,12 +59,18 @@ export async function buildAtlas(renderer: Renderer): Promise<SpriteAtlas> {
     );
   }
 
+  // Floor tile — user-provided iso block (64×64; diamond top in the upper
+  // half, side faces in the lower half). Adjacent tiles cover each other's
+  // sides, so the "raised" look only shows around the perimeter.
+  const groundTex = (await Assets.load('/assets/groud.png')) as Texture;
+  groundTex.source.scaleMode = 'nearest';
+  const grassTex = (await Assets.load('/assets/grass.png')) as Texture;
+  grassTex.source.scaleMode = 'nearest';
+
   return {
     bikes,
-    // Asphalt — calm slate gray with barely-visible edge lines so the iso
-    // grid stops creating a dizzying moire when scrolling at speed. The
-    // accent tiles (start line, boost pads) stay vivid to pop against it.
-    tile: buildTile(renderer, '#322f3c', '#3a3744', '#262330'),
+    tile: groundTex,
+    grassTile: grassTex,
     whiteTile: buildTile(renderer, '#f5f5f5', '#ffffff', '#b8b8b8'),
     boostTile: buildTile(renderer, '#ff3aa3', '#ff7ed3', '#7c1b54'),
     checkpointMarker: buildCheckpoint(renderer, '#9b59ff'),

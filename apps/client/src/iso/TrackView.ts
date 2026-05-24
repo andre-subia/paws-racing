@@ -12,6 +12,9 @@ const TILE_STEP_WORLD = 1;
 const START_LINE_DEPTH = 1.2;
 // How far behind the start line the surface extends so spawn rows have ground.
 const START_LINE_EXTENSION = 18;
+// Grass margin (world units) added around the track's bounding box so the
+// off-track area has visual context. Larger → more tiles to render.
+const GRASS_MARGIN = 12;
 
 /**
  * Iso-tiled track. Renders the centerline + a band of tiles `trackWidth` wide
@@ -112,6 +115,39 @@ export class TrackView {
           const tz = startCp.center.z + startFwdZ * depth + sideZ * off;
           placeTile(Math.round(tx / TILE_STEP_WORLD), Math.round(tz / TILE_STEP_WORLD));
         }
+      }
+    }
+
+    // 3) Fill every cell in the bounding box (plus a small margin) that the
+    // track didn't claim with grass tiles. Same iso block z-sort handles
+    // the overlap between grass and asphalt at the edges.
+    let minKx = Infinity;
+    let minKz = Infinity;
+    let maxKx = -Infinity;
+    let maxKz = -Infinity;
+    for (const key of placedKeys) {
+      const comma = key.indexOf(',');
+      const kx = Number(key.slice(0, comma));
+      const kz = Number(key.slice(comma + 1));
+      if (kx < minKx) minKx = kx;
+      if (kx > maxKx) maxKx = kx;
+      if (kz < minKz) minKz = kz;
+      if (kz > maxKz) maxKz = kz;
+    }
+    const margin = GRASS_MARGIN;
+    for (let kz = minKz - margin; kz <= maxKz + margin; kz++) {
+      for (let kx = minKx - margin; kx <= maxKx + margin; kx++) {
+        const key = `${kx},${kz}`;
+        if (placedKeys.has(key)) continue;
+        placedKeys.add(key);
+        const wx = kx * TILE_STEP_WORLD;
+        const wz = kz * TILE_STEP_WORLD;
+        const sp = new Sprite(atlas.grassTile);
+        const sc = worldToScreen(wx, wz);
+        sp.x = Math.round(sc.x - TILE_W / 2);
+        sp.y = Math.round(sc.y - TILE_H / 2);
+        sp.zIndex = wx + wz;
+        this.tilesContainer.addChild(sp);
       }
     }
 
