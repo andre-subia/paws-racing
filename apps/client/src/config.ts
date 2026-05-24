@@ -5,10 +5,14 @@ function defaultServerUrl(): string {
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     return 'ws://localhost:2567';
   }
-  // Shared via ngrok / hosted: go through the Vite /colyseus proxy on the
-  // same host, so a single tunnel forwards both the page and the game.
   const wsProto = protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${wsProto}//${host}/colyseus`;
+  // Dev sharing via ngrok still goes through Vite's /colyseus proxy. In a
+  // production build (single-host: server serves the client static files
+  // and also speaks Colyseus on the same port) the WS lives at the root.
+  if (import.meta.env.DEV) {
+    return `${wsProto}//${host}/colyseus`;
+  }
+  return `${wsProto}//${host}`;
 }
 
 export const config = {
