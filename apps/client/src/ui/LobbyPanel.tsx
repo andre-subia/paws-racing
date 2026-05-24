@@ -1,4 +1,13 @@
-import { VEHICLES } from '@paws/shared';
+import {
+  LAPS_MAX,
+  LAPS_MIN,
+  TRACKS,
+  type TrackId,
+  VEHICLES,
+  type VehicleId,
+} from '@paws/shared';
+import { TrackThumb } from './components/TrackThumb.tsx';
+import { VehicleThumb } from './components/VehicleThumb.tsx';
 
 interface LobbyPlayer {
   id: string;
@@ -15,11 +24,17 @@ interface LobbyPanelProps {
   isHost: boolean;
   countdownEndsAt: number;
   phase: 'waiting' | 'countdown' | 'racing' | 'finished';
+  trackId: string;
+  laps: number;
   onToggleReady: () => void;
-  onPickVehicle: (v: 'scout' | 'bruiser') => void;
+  onPickVehicle: (v: VehicleId) => void;
+  onPickTrack: (t: TrackId) => void;
+  onPickLaps: (n: number) => void;
   onStart: () => void;
   onLeave: () => void;
 }
+
+const TRACK_OPTIONS = Object.values(TRACKS);
 
 export function LobbyPanel({
   code,
@@ -28,8 +43,12 @@ export function LobbyPanel({
   isHost,
   countdownEndsAt,
   phase,
+  trackId,
+  laps,
   onToggleReady,
   onPickVehicle,
+  onPickTrack,
+  onPickLaps,
   onStart,
   onLeave,
 }: LobbyPanelProps) {
@@ -41,8 +60,8 @@ export function LobbyPanel({
   if (showCountdown) {
     const secs = Math.max(0, Math.ceil((countdownEndsAt - Date.now()) / 1000));
     return (
-      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-        <div className="font-pixel text-[160px] text-neon-cyan drop-shadow-[0_0_30px_rgba(66,245,224,0.8)]">
+      <div className="pointer-events-none absolute inset-x-0 top-16 flex justify-center">
+        <div className="font-pixel text-[120px] leading-none text-neon-cyan drop-shadow-[0_0_30px_rgba(66,245,224,0.8)]">
           {secs === 0 ? 'GO' : secs}
         </div>
       </div>
@@ -51,9 +70,11 @@ export function LobbyPanel({
 
   if (!showLobby) return null;
 
+  const clampLaps = (n: number) => Math.min(LAPS_MAX, Math.max(LAPS_MIN, Math.round(n)));
+
   return (
     <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[520px] rounded-2xl border-2 border-neon-cyan/40 bg-black/70 p-6">
+      <div className="w-[560px] rounded-2xl border-2 border-neon-cyan/40 bg-black/70 p-6">
         <div className="mb-4 flex items-baseline justify-between">
           <div>
             <div className="text-xs uppercase tracking-widest text-white/60">Room Code</div>
@@ -88,25 +109,79 @@ export function LobbyPanel({
                 )}
               </div>
               <div className="text-sm text-white/60">
-                {VEHICLES[p.vehicle as 'scout' | 'bruiser']?.label ?? p.vehicle}
+                {VEHICLES[p.vehicle as VehicleId]?.label ?? p.vehicle}
               </div>
             </div>
           ))}
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2">
+        {/* Track + laps — only the host can edit; everyone sees the values. */}
+        <div className="mb-4 rounded border border-white/10 bg-black/40 p-3">
+          <div className="mb-2 text-xs uppercase tracking-widest text-white/60">Race</div>
+          <div className="mb-3">
+            <span className="mb-1 block text-[10px] uppercase tracking-widest text-white/50">
+              Track
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {TRACK_OPTIONS.map((t) => {
+                const selected = trackId === t.id;
+                return (
+                  <button
+                    type="button"
+                    key={t.id}
+                    onClick={() => isHost && onPickTrack(t.id as TrackId)}
+                    disabled={!isHost}
+                    className={`flex items-center gap-2 rounded border-2 px-2 py-1.5 text-left text-xs transition ${
+                      selected
+                        ? 'border-neon-magenta bg-neon-magenta/10 text-neon-magenta'
+                        : 'border-white/15 bg-white/5 text-white/70 hover:border-white/40'
+                    } ${!isHost ? 'cursor-not-allowed opacity-70 hover:border-white/15' : ''}`}
+                  >
+                    <TrackThumb track={t} width={48} height={32} />
+                    <span className="truncate">{t.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-white/50">Laps</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => isHost && onPickLaps(clampLaps(laps - 1))}
+                disabled={!isHost}
+                className="rounded border-2 border-white/30 bg-white/5 px-2 py-0.5 text-sm hover:border-white/50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                −
+              </button>
+              <span className="w-8 text-center font-pixel text-lg text-neon-cyan">{laps}</span>
+              <button
+                type="button"
+                onClick={() => isHost && onPickLaps(clampLaps(laps + 1))}
+                disabled={!isHost}
+                className="rounded border-2 border-white/30 bg-white/5 px-2 py-0.5 text-sm hover:border-white/50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                +
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-4 gap-2">
           {Object.values(VEHICLES).map((v) => (
             <button
               type="button"
               key={v.id}
               onClick={() => onPickVehicle(v.id)}
-              className={`rounded border-2 px-3 py-2 text-sm transition ${
+              className={`flex flex-col items-center rounded border-2 px-2 py-2 text-xs transition ${
                 me?.vehicle === v.id
                   ? 'border-neon-cyan bg-neon-cyan/10 text-neon-cyan'
                   : 'border-white/15 bg-white/5 text-white/70 hover:border-white/40'
               }`}
             >
-              {v.label}
+              <VehicleThumb spec={v} size={48} />
+              <span className="mt-1">{v.label}</span>
             </button>
           ))}
         </div>

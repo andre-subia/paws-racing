@@ -3,6 +3,7 @@ import {
   type InputFlags,
   type PlayerState,
   SIM_DT,
+  type TrackDef,
   VEHICLES,
   type VehicleId,
   emptyBikeState,
@@ -30,10 +31,15 @@ export class PredictionController {
   private bike: BikeState = emptyBikeState();
   private pending: PendingInput[] = [];
   private vehicle: VehicleId = 'scout';
+  private track: TrackDef | undefined;
   private initialized = false;
 
   setVehicle(v: VehicleId) {
     this.vehicle = v;
+  }
+
+  setTrack(track: TrackDef) {
+    this.track = track;
   }
 
   /** Read-only snapshot of the predicted state. */
@@ -45,7 +51,7 @@ export class PredictionController {
   applyInput(seq: number, flags: InputFlags) {
     if (!this.initialized) return;
     const spec = VEHICLES[this.vehicle] ?? VEHICLES.scout;
-    stepBike(this.bike, flags, SIM_DT, spec);
+    stepBike(this.bike, flags, SIM_DT, spec, this.track);
     this.pending.push({ seq, flags });
     // Bound the buffer; 60 inputs ≈ 2 s at 30Hz, well beyond worst RTT.
     if (this.pending.length > 60) this.pending.shift();
@@ -100,7 +106,7 @@ export class PredictionController {
     // Replay unacked inputs on top of the authoritative baseline.
     const spec = VEHICLES[this.vehicle] ?? VEHICLES.scout;
     for (const p of this.pending) {
-      stepBike(this.bike, p.flags, SIM_DT, spec);
+      stepBike(this.bike, p.flags, SIM_DT, spec, this.track);
     }
   }
 }

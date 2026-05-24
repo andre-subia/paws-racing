@@ -4,7 +4,11 @@ export const BROADCAST_HZ = 20;
 export const BROADCAST_DT = 1 / BROADCAST_HZ;
 
 export const MAX_PLAYERS_PER_ROOM = 8;
-export const LAPS_PER_RACE = 3;
+export const LAPS_DEFAULT = 5;
+export const LAPS_MIN = 1;
+export const LAPS_MAX = 9;
+/** Legacy alias — read `state.laps` for the live value. */
+export const LAPS_PER_RACE = LAPS_DEFAULT;
 export const COUNTDOWN_MS = 3000;
 export const RECONNECT_GRACE_S = 20;
 
@@ -15,7 +19,7 @@ export const ROOM_NAMES = {
 
 export type RoomName = (typeof ROOM_NAMES)[keyof typeof ROOM_NAMES];
 
-export type VehicleId = 'scout' | 'bruiser';
+export type VehicleId = 'scout' | 'bruiser' | 'drifter' | 'inferno';
 
 export interface VehicleSpec {
   id: VehicleId;
@@ -24,6 +28,8 @@ export interface VehicleSpec {
   topSpeed: number;
   turnRate: number;
   driftGrip: number;
+  /** Public path under apps/client/public for the body sprite. */
+  spritePath: string;
 }
 
 export const VEHICLES: Record<VehicleId, VehicleSpec> = {
@@ -34,6 +40,7 @@ export const VEHICLES: Record<VehicleId, VehicleSpec> = {
     topSpeed: 48,
     turnRate: 2.6,
     driftGrip: 0.55,
+    spritePath: '/assets/cats/cat1.png',
   },
   bruiser: {
     id: 'bruiser',
@@ -42,8 +49,32 @@ export const VEHICLES: Record<VehicleId, VehicleSpec> = {
     topSpeed: 58,
     turnRate: 2.0,
     driftGrip: 0.45,
+    spritePath: '/assets/cats/cat2.png',
+  },
+  drifter: {
+    id: 'drifter',
+    label: 'Drifter',
+    accel: 19,
+    topSpeed: 52,
+    turnRate: 3.0,
+    driftGrip: 0.65,
+    spritePath: '/assets/cats/cat3.png',
+  },
+  inferno: {
+    id: 'inferno',
+    label: 'Inferno',
+    accel: 26,
+    topSpeed: 50,
+    turnRate: 2.4,
+    driftGrip: 0.5,
+    spritePath: '/assets/cats/cat4.png',
   },
 };
 
-export const TRACK_IDS = ['neo_kibble_city'] as const;
+export const TRACK_IDS = [
+  'neo_kibble_city',
+  'catnip_speedway',
+  'alleycat_sprawl',
+  'litter_box_loop',
+] as const;
 export type TrackId = (typeof TRACK_IDS)[number];

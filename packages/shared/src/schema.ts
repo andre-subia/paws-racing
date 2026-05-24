@@ -51,6 +51,7 @@ export class RaceState extends Schema {
   @type('number') countdownEndsAt = 0;
   @type('number') tick = 0;
   @type('number') serverTime = 0;
+  @type('number') laps = 5;
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
   @type(['string']) finishOrder = new ArraySchema<string>();
 }

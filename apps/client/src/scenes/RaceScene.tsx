@@ -1,18 +1,15 @@
-import { type PlayerState, type RaceState, getTrack } from '@paws/shared';
-import { Environment } from '@react-three/drei';
-import { Canvas, useFrame } from '@react-three/fiber';
+import { type PlayerState, type RaceState, type VehicleId, getTrack } from '@paws/shared';
 import { type Room, getStateCallbacks } from 'colyseus.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type CameraTarget, ChaseCamera } from '../game/Camera.tsx';
-import { Track } from '../game/Track.tsx';
-import { Vehicle } from '../game/Vehicle.tsx';
+import { IsoScene } from '../iso/IsoScene.ts';
 import { createRoom, joinByCode, quickRace } from '../net/client.ts';
 import { type InputController, startInputLoop } from '../net/input.ts';
-import { type InterpolatedPose, RemoteInterpolator } from '../net/interpolation.ts';
+import { RemoteInterpolator } from '../net/interpolation.ts';
 import { PredictionController } from '../net/prediction.ts';
 import { useGame } from '../store/game.ts';
 import { Hud } from '../ui/Hud.tsx';
 import { LobbyPanel } from '../ui/LobbyPanel.tsx';
+import { MiniMap } from '../ui/MiniMap.tsx';
 import { Results } from '../ui/Results.tsx';
 
 type ConnState = 'connecting' | 'connected' | 'error' | 'disconnected';
@@ -30,9 +27,8 @@ export function RaceScene() {
   const [error, setError] = useState<string | null>(null);
   const [, force] = useState(0);
 
-  const predictionRef = useRef<PredictionController>(new PredictionController());
-  const interpolatorRef = useRef<RemoteInterpolator>(new RemoteInterpolator());
-  const cameraTargetRef = useRef<CameraTarget | null>(null);
+  const pixiHostRef = useRef<HTMLDivElement | null>(null);
+  const isoSceneRef = useRef<IsoScene | null>(null);
 
   useEffect(() => {
     if (!joinIntent) return;
@@ -42,9 +38,9 @@ export function RaceScene() {
 
     (async () => {
       try {
-        predictionRef.current = new PredictionController();
-        interpolatorRef.current = new RemoteInterpolator();
-        predictionRef.current.setVehicle(vehicle);
+        const prediction = new PredictionController();
+        const interpolator = new RemoteInterpolator();
+        prediction.setVehicle(vehicle);
 
         let room: Room<RaceState>;
         switch (joinIntent.kind) {
@@ -52,7 +48,12 @@ export function RaceScene() {
             room = await quickRace({ name, vehicle });
             break;
           case 'create':
-            room = await createRoom({ name, vehicle });
+            room = await createRoom({
+              name,
+              vehicle,
+              trackId: joinIntent.trackId,
+              laps: joinIntent.laps,
+            });
             break;
           case 'join':
             room = await joinByCode({ name, vehicle, code: joinIntent.code });
@@ -64,20 +65,27 @@ export function RaceScene() {
           return;
         }
         activeRoom = room;
-        setConn('connected');
 
-        const prediction = predictionRef.current;
-        const interpolator = interpolatorRef.current;
-
+        let stateReady = false;
+        let trackBound = '';
         room.onStateChange((state) => {
+          if (!state || !state.players) return;
+          if (state.trackId && state.trackId !== trackBound) {
+            prediction.setTrack(getTrack(state.trackId));
+            trackBound = state.trackId;
+          }
           for (const player of state.players.values()) {
             if (player.id === room.sessionId) {
-              const v = player.vehicle === 'bruiser' ? 'bruiser' : 'scout';
-              prediction.setVehicle(v);
+              prediction.setVehicle(player.vehicle as VehicleId);
               prediction.onSnapshot(player);
             } else {
               interpolator.pushFromSchema(player);
             }
+          }
+          if (!stateReady) {
+            stateReady = true;
+            setConn('connected');
+            setCtx({ room, prediction, interpolator });
           }
           force((n) => n + 1);
         });
@@ -94,8 +102,6 @@ export function RaceScene() {
         });
 
         inputCtrl = startInputLoop(room, prediction);
-
-        setCtx({ room, prediction, interpolator });
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
         setConn('error');
@@ -106,59 +112,109 @@ export function RaceScene() {
       cancelled = true;
       inputCtrl?.stop();
       activeRoom?.leave();
+      isoSceneRef.current?.destroy();
+      isoSceneRef.current = null;
     };
-  }, [name, vehicle, joinIntent]);
+    // Only re-run when the join intent itself changes. `name` and `vehicle`
+    // are captured in closure at join time; changing them in the lobby would
+    // otherwise leave the room and create a fresh one (with a new code for
+    // private rooms), splitting players across rooms.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: see above
+  }, [joinIntent]);
+
+  // Bring up the Pixi scene once the room is connected. Rebuilds when the
+  // track changes (host swaps map from the lobby).
+  const sceneTrackId = ctx?.room.state?.trackId ?? 'neo_kibble_city';
+  useEffect(() => {
+    if (!ctx || !pixiHostRef.current) return;
+    if (isoSceneRef.current) {
+      isoSceneRef.current.destroy();
+      isoSceneRef.current = null;
+    }
+    const track = getTrack(sceneTrackId);
+    let scene: IsoScene | null = null;
+    let cancelled = false;
+    IsoScene.create({
+      parent: pixiHostRef.current,
+      room: ctx.room,
+      prediction: ctx.prediction,
+      interpolator: ctx.interpolator,
+      track,
+    }).then((s) => {
+      if (cancelled) {
+        s.destroy();
+        return;
+      }
+      scene = s;
+      isoSceneRef.current = s;
+    });
+    return () => {
+      cancelled = true;
+      if (scene) {
+        scene.destroy();
+        isoSceneRef.current = null;
+      }
+    };
+  }, [ctx, sceneTrackId]);
 
   const room = ctx?.room;
-  const phase = (room?.state.phase ?? 'waiting') as 'waiting' | 'countdown' | 'racing' | 'finished';
-  const trackId = room?.state.trackId ?? 'neo_kibble_city';
+  const phase = (room?.state?.phase ?? 'waiting') as
+    | 'waiting'
+    | 'countdown'
+    | 'racing'
+    | 'finished';
+  const trackId = room?.state?.trackId ?? 'neo_kibble_city';
   const track = useMemo(() => getTrack(trackId), [trackId]);
 
   const playersArr = useMemo(
-    () => (room ? Array.from(room.state.players.values()) : []),
+    () => (room?.state?.players ? Array.from(room.state.players.values()) : []),
     // biome-ignore lint/correctness/useExhaustiveDependencies: re-derive on every forced render
-    [room, room?.state.players.size, ctx, phase],
+    [room, room?.state?.players?.size, ctx, phase],
   );
 
-  const localPlayer = room?.state.players.get(room.sessionId);
+  const localPlayer = room?.state?.players?.get(room.sessionId);
   const isHost = !!localPlayer?.host;
+
+  const finishOrderIds = useMemo(
+    () => (room?.state?.finishOrder ? Array.from(room.state.finishOrder) : []),
+    // biome-ignore lint/correctness/useExhaustiveDependencies: re-derive on every forced render
+    [room, room?.state?.finishOrder?.length, ctx, phase],
+  );
+
+  const ranking = useMemo(() => {
+    if (!room || playersArr.length === 0) return [];
+    const finishIdx = new Map<string, number>();
+    finishOrderIds.forEach((id, i) => finishIdx.set(id, i));
+    const cpCount = track.checkpoints.length;
+    const sorted = [...playersArr].sort((a, b) => {
+      const af = finishIdx.get(a.id);
+      const bf = finishIdx.get(b.id);
+      if (af !== undefined && bf !== undefined) return af - bf;
+      if (af !== undefined) return -1;
+      if (bf !== undefined) return 1;
+      const aProg = a.lap * cpCount + Math.max(0, a.checkpoint);
+      const bProg = b.lap * cpCount + Math.max(0, b.checkpoint);
+      return bProg - aProg;
+    });
+    return sorted.map((p) => ({
+      id: p.id,
+      name: p.name,
+      isLocal: p.id === room.sessionId,
+      finished: finishIdx.has(p.id),
+    }));
+  }, [room, playersArr, finishOrderIds, track]);
+
+  const localFinished = (localPlayer?.finishedAt ?? 0) > 0;
+  const spectatorTarget = useMemo(() => {
+    if (!localFinished) return null;
+    // Spectate the top-ranked still-racing player.
+    const target = ranking.find((r) => !r.finished && !r.isLocal);
+    return target ? target.name : null;
+  }, [localFinished, ranking]);
 
   return (
     <>
-      <Canvas
-        shadows
-        camera={{ position: [0, 6, 18], fov: 60 }}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
-        dpr={[1, 1.5]}
-      >
-        <color attach="background" args={['#0b0418']} />
-        <fog attach="fog" args={['#0b0418', 80, 220]} />
-
-        <ambientLight intensity={0.4} color="#5a3aa0" />
-        <directionalLight
-          position={[40, 60, 20]}
-          intensity={1.1}
-          castShadow
-          shadow-mapSize={[1024, 1024]}
-        />
-        <hemisphereLight args={['#ff7ed3', '#1a0a3a', 0.4]} />
-        <Environment preset="night" />
-
-        <Track track={track} />
-
-        {ctx && (
-          <SceneRenderer
-            players={playersArr}
-            localSid={ctx.room.sessionId}
-            prediction={ctx.prediction}
-            interpolator={ctx.interpolator}
-            cameraTargetRef={cameraTargetRef}
-            phase={phase}
-          />
-        )}
-
-        <ChaseCamera targetRef={cameraTargetRef} />
-      </Canvas>
+      <div ref={pixiHostRef} className="absolute inset-0" />
 
       {room && phase === 'waiting' && (
         <LobbyPanel
@@ -174,11 +230,15 @@ export function RaceScene() {
           isHost={isHost}
           countdownEndsAt={room.state.countdownEndsAt}
           phase={phase}
+          trackId={room.state.trackId}
+          laps={room.state.laps}
           onToggleReady={() => room.send('ready', {})}
           onPickVehicle={(v) => {
             setVehicle(v);
             room.send('vehicle', { vehicle: v });
           }}
+          onPickTrack={(t) => room.send('track', { trackId: t })}
+          onPickLaps={(n) => room.send('laps', { laps: n })}
           onStart={() => room.send('start', {})}
           onLeave={endRace}
         />
@@ -192,27 +252,36 @@ export function RaceScene() {
           isHost={isHost}
           countdownEndsAt={room.state.countdownEndsAt}
           phase={phase}
+          trackId={room.state.trackId}
+          laps={room.state.laps}
           onToggleReady={() => undefined}
           onPickVehicle={() => undefined}
+          onPickTrack={() => undefined}
+          onPickLaps={() => undefined}
           onStart={() => undefined}
           onLeave={endRace}
         />
       )}
 
       {phase === 'racing' && room && localPlayer && (
-        <Hud
-          status="RACING"
-          speed={ctx?.prediction.getState().speed ?? localPlayer.speed}
-          roomCode={room.state.code}
-          players={playersArr.length}
-          lap={localPlayer.lap}
-          checkpoint={localPlayer.checkpoint}
-          totalCheckpoints={track.checkpoints.length}
-          rank={localPlayer.position_rank}
-          boostUntil={localPlayer.boostUntil}
-          serverTime={room.state.serverTime}
-          onLeave={endRace}
-        />
+        <>
+          <Hud
+            status="RACING"
+            speed={ctx?.prediction.getState().speed ?? localPlayer.speed}
+            roomCode={room.state.code}
+            players={playersArr.length}
+            lap={localPlayer.lap}
+            totalLaps={room.state.laps}
+            checkpoint={localPlayer.checkpoint}
+            totalCheckpoints={track.checkpoints.length}
+            ranking={ranking}
+            spectating={spectatorTarget}
+            boostUntil={localPlayer.boostUntil}
+            serverTime={room.state.serverTime}
+            onLeave={endRace}
+          />
+          <MiniMap trackId={trackId} players={playersArr} localSid={room.sessionId} />
+        </>
       )}
 
       {phase === 'finished' && room && (
@@ -223,10 +292,28 @@ export function RaceScene() {
         />
       )}
 
-      {error && (
-        <div className="absolute inset-x-0 top-0 bg-red-600/80 px-4 py-2 text-center text-white">
-          {error}
+      {!ctx && !error && (
+        <div className="absolute inset-0 flex items-center justify-center bg-ink/80">
+          <div className="rounded-lg border-2 border-neon-cyan/40 bg-black/70 px-8 py-6 text-center">
+            <div className="font-pixel text-lg text-neon-cyan">CONNECTING</div>
+            <div className="mt-2 text-xs text-white/50">Joining race room…</div>
+          </div>
         </div>
+      )}
+
+      {error && (
+        <>
+          <div className="absolute inset-x-0 top-0 bg-red-600/80 px-4 py-2 text-center text-white">
+            {error}
+          </div>
+          <button
+            type="button"
+            onClick={endRace}
+            className="absolute left-1/2 top-12 -translate-x-1/2 rounded border border-white/30 bg-black/60 px-4 py-2 text-sm uppercase tracking-widest hover:border-white/60"
+          >
+            Back to Menu
+          </button>
+        </>
       )}
     </>
   );
@@ -237,7 +324,6 @@ function buildResults(
   localSid: string,
   state: RaceState,
 ): Array<{ rank: number; name: string; finishedAt: number; isLocal: boolean; vehicle: string }> {
-  // Finished players in order; then unfinished sorted by lap+checkpoint descending.
   const finishedIds = Array.from(state.finishOrder);
   const finished = finishedIds.map((id, i) => {
     const p = players.find((pp) => pp.id === id);
@@ -260,93 +346,4 @@ function buildResults(
     vehicle: p.vehicle,
   }));
   return [...finished, ...unfinished];
-}
-
-interface RendererProps {
-  players: PlayerState[];
-  localSid: string;
-  prediction: PredictionController;
-  interpolator: RemoteInterpolator;
-  cameraTargetRef: { current: CameraTarget | null };
-  phase: 'waiting' | 'countdown' | 'racing' | 'finished';
-}
-
-const _pose: InterpolatedPose = { x: 0, y: 0, z: 0, yaw: 0, drifting: false };
-
-function SceneRenderer({
-  players,
-  localSid,
-  prediction,
-  interpolator,
-  cameraTargetRef,
-  phase,
-}: RendererProps) {
-  const poses = useRef(new Map<string, InterpolatedPose>());
-
-  useFrame(() => {
-    for (const p of players) {
-      let pose = poses.current.get(p.id);
-      if (!pose) {
-        pose = { x: 0, y: 0.5, z: 0, yaw: 0, drifting: false };
-        poses.current.set(p.id, pose);
-      }
-      if (p.id === localSid) {
-        if (phase === 'racing') {
-          const s = prediction.getState();
-          pose.x = s.x;
-          pose.y = s.y;
-          pose.z = s.z;
-          pose.yaw = s.yaw;
-          pose.drifting = s.drifting;
-        } else {
-          pose.x = p.position.x;
-          pose.y = p.position.y;
-          pose.z = p.position.z;
-          pose.yaw = quatYaw(p.rotation.x, p.rotation.y, p.rotation.z, p.rotation.w);
-          pose.drifting = p.drifting;
-        }
-        if (!cameraTargetRef.current) cameraTargetRef.current = { x: 0, y: 0, z: 0, yaw: 0 };
-        cameraTargetRef.current.x = pose.x;
-        cameraTargetRef.current.y = pose.y;
-        cameraTargetRef.current.z = pose.z;
-        cameraTargetRef.current.yaw = pose.yaw;
-      } else {
-        if (interpolator.sample(p.id, _pose)) {
-          pose.x = _pose.x;
-          pose.y = _pose.y;
-          pose.z = _pose.z;
-          pose.yaw = _pose.yaw;
-          pose.drifting = _pose.drifting;
-        }
-      }
-    }
-  });
-
-  return (
-    <>
-      {players.map((p) => {
-        const pose = poses.current.get(p.id) ?? { x: 0, y: 0.5, z: 0, yaw: 0, drifting: false };
-        const isLocal = p.id === localSid;
-        const color = isLocal ? '#42f5e0' : p.vehicle === 'bruiser' ? '#ff3aa3' : '#ffb142';
-        return (
-          <Vehicle
-            key={p.id}
-            x={pose.x}
-            y={pose.y}
-            z={pose.z}
-            yaw={pose.yaw}
-            color={color}
-            snap={isLocal && phase === 'racing'}
-            drifting={pose.drifting}
-          />
-        );
-      })}
-    </>
-  );
-}
-
-function quatYaw(x: number, y: number, z: number, w: number): number {
-  const siny_cosp = 2 * (w * y + x * z);
-  const cosy_cosp = 1 - 2 * (y * y + x * x);
-  return Math.atan2(siny_cosp, cosy_cosp);
 }

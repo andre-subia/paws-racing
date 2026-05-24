@@ -83,14 +83,15 @@ function buildLoop(): Vec3Lit[] {
 const loop = buildLoop();
 
 function spawnPoints(): SpawnPoint[] {
-  // Grid up the start line in two staggered rows on the right straight.
+  // Grid sits behind the start line so cars cross the white line at race
+  // start. Forward is -z, so "behind" means z > STRAIGHT/2.
   const out: SpawnPoint[] = [];
   for (let i = 0; i < MAX_PLAYERS_PER_ROOM; i++) {
     const row = i % 2;
     const col = Math.floor(i / 2);
     out.push({
       x: -3 + row * 3,
-      z: STRAIGHT / 2 - 4 - col * 4,
+      z: STRAIGHT / 2 + 4 + col * 4,
       yaw: 0, // bike faces -z (forward heading)
     });
   }

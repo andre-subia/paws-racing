@@ -1,4 +1,4 @@
-import { ROOM_NAMES, type RaceState, type VehicleId } from '@paws/shared';
+import { ROOM_NAMES, type RaceState, type TrackId, type VehicleId } from '@paws/shared';
 import { Client, type Room } from 'colyseus.js';
 import { config } from '../config.ts';
 import { generateCode } from './codes.ts';
@@ -30,7 +30,7 @@ export async function quickRace(options: JoinOptions): Promise<Room<RaceState>> 
  * original create options — a server-side code wouldn't be in those options.
  */
 export async function createRoom(
-  options: JoinOptions,
+  options: JoinOptions & { trackId?: TrackId; laps?: number },
 ): Promise<Room<RaceState>> {
   const code = generateCode();
   return getClient().create<RaceState>(ROOM_NAMES.RACE, { ...options, code });

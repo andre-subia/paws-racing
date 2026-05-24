@@ -6,13 +6,17 @@ import {
   emptyBikeState,
   getTrack,
   type InputCommand,
-  LAPS_PER_RACE,
+  LAPS_DEFAULT,
+  LAPS_MAX,
+  LAPS_MIN,
   MAX_PLAYERS_PER_ROOM,
   PlayerState,
   RaceState,
   SIM_HZ,
   stepBike,
   type TrackDef,
+  TRACK_IDS,
+  type TrackId,
   VEHICLES,
   type VehicleId,
   yawToQuat,
@@ -32,6 +36,16 @@ interface JoinOptions {
   vehicle?: VehicleId;
   code?: string;
   trackId?: string;
+  laps?: number;
+}
+
+function clampLaps(v: unknown): number {
+  const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : LAPS_DEFAULT;
+  return Math.min(LAPS_MAX, Math.max(LAPS_MIN, n));
+}
+
+function isValidTrackId(id: unknown): id is TrackId {
+  return typeof id === 'string' && (TRACK_IDS as readonly string[]).includes(id);
 }
 
 interface PendingInput {
@@ -61,6 +75,7 @@ export class RaceRoom extends Room<RaceState> {
 
     this.track = getTrack(options.trackId ?? this.state.trackId);
     this.state.trackId = this.track.id;
+    this.state.laps = clampLaps(options.laps);
 
     this.setPatchRate(1000 * BROADCAST_DT);
 
@@ -85,9 +100,21 @@ export class RaceRoom extends Room<RaceState> {
       if (this.state.phase !== 'waiting') return;
       const p = this.state.players.get(client.sessionId);
       if (!p) return;
-      if (payload.vehicle === 'scout' || payload.vehicle === 'bruiser') {
-        p.vehicle = payload.vehicle;
-      }
+      if (payload.vehicle in VEHICLES) p.vehicle = payload.vehicle;
+    });
+
+    this.onMessage('track', (client, payload: { trackId: TrackId }) => {
+      if (this.state.phase !== 'waiting') return;
+      if (this.state.hostId !== client.sessionId) return;
+      if (!isValidTrackId(payload.trackId)) return;
+      this.track = getTrack(payload.trackId);
+      this.state.trackId = this.track.id;
+    });
+
+    this.onMessage('laps', (client, payload: { laps: number }) => {
+      if (this.state.phase !== 'waiting') return;
+      if (this.state.hostId !== client.sessionId) return;
+      this.state.laps = clampLaps(payload.laps);
     });
 
     this.onMessage('start', (client) => {
@@ -104,7 +131,8 @@ export class RaceRoom extends Room<RaceState> {
       throw new Error('race already started');
     }
 
-    const vehicle: VehicleId = options.vehicle === 'bruiser' ? 'bruiser' : 'scout';
+    const vehicle: VehicleId =
+      options.vehicle && options.vehicle in VEHICLES ? options.vehicle : 'scout';
     const player = new PlayerState();
     player.id = client.sessionId;
     player.name = (options.name ?? 'Racer').slice(0, 16) || 'Racer';
@@ -281,13 +309,13 @@ export class RaceRoom extends Room<RaceState> {
       const queue = this.inputQueue.get(sid);
 
       if (!acceptInputs || player.finishedAt > 0 || !queue || queue.length === 0) {
-        stepBike(bike, 0, dt, spec);
+        stepBike(bike, 0, dt, spec, this.track);
       } else {
         const n = queue.length;
         const sub = dt / n;
         for (let i = 0; i < n; i++) {
           const cmd = queue.shift()!;
-          stepBike(bike, cmd.flags, sub, spec);
+          stepBike(bike, cmd.flags, sub, spec, this.track);
           player.lastSeq = cmd.seq;
         }
       }
@@ -313,7 +341,7 @@ export class RaceRoom extends Room<RaceState> {
         const mem = this.gateMem.get(sid);
         if (!bike || !mem) continue;
 
-        const result = advanceCheckpoint(this.track, player, bike, mem, LAPS_PER_RACE, now);
+        const result = advanceCheckpoint(this.track, player, bike, mem, this.state.laps, now);
         if (result.finished) {
           this.state.finishOrder.push(player.id);
           player.position_rank = this.state.finishOrder.length;
@@ -337,10 +365,24 @@ export class RaceRoom extends Room<RaceState> {
       if (bike) syncToSchema(bike, player);
     }
 
-    // If everyone has finished, end the race.
+    // End early once the penultimate racer finishes (last place is inferred).
+    // - 1 player: must finish themselves.
+    // - 2+ players: when N-1 have finished, auto-finish the lone straggler in
+    //   last place and end the race.
     if (acceptInputs) {
       const players = Array.from(this.state.players.values());
-      if (players.length > 0 && players.every((p) => p.finishedAt > 0)) {
+      const total = players.length;
+      const finished = players.filter((p) => p.finishedAt > 0).length;
+      if (total === 1 && finished === 1) {
+        this.finishRace();
+      } else if (total > 1 && finished >= total - 1) {
+        for (const p of players) {
+          if (p.finishedAt === 0) {
+            this.state.finishOrder.push(p.id);
+            p.position_rank = this.state.finishOrder.length;
+            p.finishedAt = now;
+          }
+        }
         this.finishRace();
       }
     }

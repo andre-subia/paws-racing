@@ -1,10 +1,10 @@
-import type { VehicleId } from '@paws/shared';
+import type { TrackId, VehicleId } from '@paws/shared';
 import { create } from 'zustand';
 
 export type Scene = 'menu' | 'race';
 export type JoinIntent =
   | { kind: 'quick' }
-  | { kind: 'create' }
+  | { kind: 'create'; trackId: TrackId; laps: number }
   | { kind: 'join'; code: string };
 
 interface GameStore {

@@ -1,5 +1,6 @@
 import { INPUT_FLAGS, type InputFlags, hasFlag } from './input.js';
 import { type VehicleSpec } from './constants.js';
+import { type TrackDef, type Vec3Lit } from './track.js';
 
 /**
  * Minimal bike kinematic state. Identical structure used on both client (for
@@ -23,13 +24,20 @@ export function emptyBikeState(): BikeState {
 
 /**
  * Deterministic arcade-bike step. Same `state, input, dt, spec` produces the
- * same `state`. This is the single source of truth so client prediction and
- * server authority stay aligned.
+ * same `state`. If `track` is provided, the bike is clamped to within
+ * trackWidth/2 of the centerline so it can't leave the map.
  *
- * Future: replace internals with Rapier when track collision lands in W3.
- * The signature is stable; callers should not need to change.
+ * Velocity is strictly along the heading (Mode-7 racer feel): pressing left
+ * or right turns the bike and the velocity vector follows instantly — no
+ * lateral slide. This is the original tuning the player asked to keep.
  */
-export function stepBike(state: BikeState, flags: InputFlags, dt: number, spec: VehicleSpec): void {
+export function stepBike(
+  state: BikeState,
+  flags: InputFlags,
+  dt: number,
+  spec: VehicleSpec,
+  track?: TrackDef,
+): void {
   const throttle = hasFlag(flags, INPUT_FLAGS.THROTTLE) ? 1 : 0;
   const brake = hasFlag(flags, INPUT_FLAGS.BRAKE) ? 1 : 0;
   const left = hasFlag(flags, INPUT_FLAGS.LEFT) ? 1 : 0;
@@ -54,7 +62,72 @@ export function stepBike(state: BikeState, flags: InputFlags, dt: number, spec: 
   state.vx = vx;
   state.vz = vz;
 
+  if (track) clampToTrack(state, track);
+
   state.drifting = drifting && Math.abs(steer) > 0.1 && state.speed > 8;
+}
+
+/**
+ * Push the bike back inside the track if it has crossed the wall. Kills the
+ * outward component of velocity and applies a small speed penalty so grinding
+ * walls is costly. Cheap O(n) over loop segments.
+ */
+export function clampToTrack(state: BikeState, track: TrackDef): void {
+  const halfW = track.trackWidth / 2;
+  const near = nearestOnLoop(track.loop, state.x, state.z);
+  if (near.dist <= halfW) return;
+
+  const len = near.dist || 1;
+  const nx = (state.x - near.px) / len;
+  const nz = (state.z - near.pz) / len;
+
+  state.x = near.px + nx * halfW;
+  state.z = near.pz + nz * halfW;
+
+  const outV = state.vx * nx + state.vz * nz;
+  if (outV > 0) {
+    state.vx -= nx * outV;
+    state.vz -= nz * outV;
+  }
+
+  state.vx *= 0.88;
+  state.vz *= 0.88;
+  state.speed = Math.hypot(state.vx, state.vz);
+}
+
+function nearestOnLoop(
+  loop: Vec3Lit[],
+  x: number,
+  z: number,
+): { px: number; pz: number; dist: number } {
+  let bestD2 = Infinity;
+  let bestPx = 0;
+  let bestPz = 0;
+  const n = loop.length;
+  for (let i = 0; i < n; i++) {
+    const a = loop[i]!;
+    const b = loop[(i + 1) % n]!;
+    const abx = b.x - a.x;
+    const abz = b.z - a.z;
+    const len2 = abx * abx + abz * abz;
+    let t = 0;
+    if (len2 > 0) {
+      t = ((x - a.x) * abx + (z - a.z) * abz) / len2;
+      if (t < 0) t = 0;
+      else if (t > 1) t = 1;
+    }
+    const px = a.x + abx * t;
+    const pz = a.z + abz * t;
+    const dx = x - px;
+    const dz = z - pz;
+    const d2 = dx * dx + dz * dz;
+    if (d2 < bestD2) {
+      bestD2 = d2;
+      bestPx = px;
+      bestPz = pz;
+    }
+  }
+  return { px: bestPx, pz: bestPz, dist: Math.sqrt(bestD2) };
 }
 
 export function yawToQuat(yaw: number): { x: number; y: number; z: number; w: number } {
