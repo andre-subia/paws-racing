@@ -63,16 +63,26 @@ export function advanceCheckpoint(
   return { crossed: false, finished: false };
 }
 
+export interface RearHit {
+  victimId: string;
+  attackerId: string;
+  /** Closing speed along the contact normal at the moment of impact (m/s). */
+  impactSpeed: number;
+}
+
 /**
  * Resolves vehicle-vehicle overlaps via pairwise capsule separation. Cheap
- * O(n²); fine for 8 players.
+ * O(n²); fine for 8 players. Returns the list of rear-hit events detected
+ * during the same sweep (attacker behind victim, both forwards aligned with
+ * the contact normal), so the caller can apply damage.
  */
 export function resolveBikeCollisions(
   ids: string[],
   bikes: Map<string, BikeState>,
   radius = 0.9,
-) {
+): RearHit[] {
   const minSep = radius * 2;
+  const hits: RearHit[] = [];
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {
       const a = bikes.get(ids[i]!);
@@ -83,13 +93,47 @@ export function resolveBikeCollisions(
       const distSq = dx * dx + dz * dz;
       if (distSq >= minSep * minSep || distSq < 0.0001) continue;
       const dist = Math.sqrt(distSq);
-      const nx = dx / dist;
+      const nx = dx / dist; // points from A to B
       const nz = dz / dist;
       const overlap = (minSep - dist) * 0.5;
       a.x -= nx * overlap;
       a.z -= nz * overlap;
       b.x += nx * overlap;
       b.z += nz * overlap;
+
+      // --- Rear-hit detection (BEFORE bounce, so closing speed is the real
+      // pre-impact value, not the dampened one). A hits B's rear when A is
+      // behind B (normal aligned with B's forward), A is moving toward B
+      // (forward dot positive), and the closing speed along the normal
+      // exceeds MIN_IMPACT.
+      const fxA = -Math.sin(a.yaw);
+      const fzA = -Math.cos(a.yaw);
+      const fxB = -Math.sin(b.yaw);
+      const fzB = -Math.cos(b.yaw);
+      const nFwdA = nx * fxA + nz * fzA;
+      const nFwdB = nx * fxB + nz * fzB;
+      const closingPre = (a.vx - b.vx) * nx + (a.vz - b.vz) * nz;
+      const REAR_DOT = 0.45;
+      const APPROACH_DOT = 0.2;
+      const MIN_IMPACT = 2.5;
+      // closingPre is positive in BOTH cases when bikes are getting closer
+      // (it's -d(distance)/dt regardless of which side `n` points to).
+      // The dot-product signs are what tell us who's behind whom.
+      if (nFwdB > REAR_DOT && nFwdA > APPROACH_DOT && closingPre > MIN_IMPACT) {
+        // a is behind b → a hits b's rear.
+        hits.push({
+          victimId: ids[j]!,
+          attackerId: ids[i]!,
+          impactSpeed: closingPre,
+        });
+      } else if (nFwdA < -REAR_DOT && nFwdB < -APPROACH_DOT && closingPre > MIN_IMPACT) {
+        // b is behind a → b hits a's rear.
+        hits.push({
+          victimId: ids[i]!,
+          attackerId: ids[j]!,
+          impactSpeed: closingPre,
+        });
+      }
 
       // Cartoonish velocity exchange along the contact normal.
       const relVel = (b.vx - a.vx) * nx + (b.vz - a.vz) * nz;
@@ -99,13 +143,13 @@ export function resolveBikeCollisions(
         a.vz += nz * bounce;
         b.vx -= nx * bounce;
         b.vz -= nz * bounce;
-        // Damp scalar speeds so big hits slow both bikes.
         const drop = Math.min(8, Math.abs(relVel) * 0.5);
         a.speed = Math.max(0, a.speed - drop * 0.5);
         b.speed = Math.max(0, b.speed - drop * 0.5);
       }
     }
   }
+  return hits;
 }
 
 /**

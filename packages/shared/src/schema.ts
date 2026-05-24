@@ -41,6 +41,11 @@ export class PlayerState extends Schema {
   // Boost state (set by server when a boost pad triggers)
   @type('number') boostUntil = 0;
   @type('number') boostSpeed = 0;
+
+  // Damage model. Rear-hits drain health; reaching 0 sets explodedAt and
+  // takes the player out of the race (treated like a finish in last place).
+  @type('number') health = 100;
+  @type('number') explodedAt = 0;
 }
 
 export class RaceState extends Schema {

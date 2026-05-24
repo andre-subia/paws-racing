@@ -4,6 +4,7 @@ import type { Room } from 'colyseus.js';
 import type { InterpolatedPose, RemoteInterpolator } from '../net/interpolation.js';
 import type { PredictionController } from '../net/prediction.js';
 import { BikeView } from './BikeView.js';
+import { Explosion } from './Explosion.js';
 import { TrackView } from './TrackView.js';
 import { buildAtlas, type SpriteAtlas } from './sprites.js';
 import { Viewport } from './viewport.js';
@@ -33,6 +34,9 @@ export class IsoScene {
   private trackView: TrackView;
   private bikes = new Map<string, BikeView>();
   private bikesLayer: Container;
+  private fxLayer: Container;
+  private explosions: Explosion[] = [];
+  private lastExplodedAt = new Map<string, number>();
   private deps: IsoSceneDeps;
   private pose: InterpolatedPose = { x: 0, y: 0, z: 0, yaw: 0, drifting: false };
   private resizeListener: () => void;
@@ -46,6 +50,9 @@ export class IsoScene {
     this.bikesLayer = new Container();
     this.bikesLayer.sortableChildren = true;
     this.viewport.world.addChild(this.bikesLayer);
+    this.fxLayer = new Container();
+    this.fxLayer.sortableChildren = true;
+    this.viewport.world.addChild(this.fxLayer);
 
     this.resizeListener = () => this.viewport.resize();
     window.addEventListener('resize', this.resizeListener);
@@ -96,8 +103,23 @@ export class IsoScene {
     for (const player of players.values()) {
       activeIds.add(player.id);
       const view = this.ensureBike(player, localSid);
-      // Finished racers disappear from the track (spectator mode).
-      view.container.visible = player.finishedAt === 0;
+      // Finished or currently exploded racers disappear from the track. The
+      // explosion case is transient — the server clears explodedAt back to 0
+      // once the bike respawns at the nearest checkpoint.
+      view.container.visible = player.finishedAt === 0 && player.explodedAt === 0;
+
+      // Detect explosion transition (server sets explodedAt once on impact).
+      const prevExploded = this.lastExplodedAt.get(player.id) ?? 0;
+      if (player.explodedAt > 0 && player.explodedAt !== prevExploded) {
+        const expl = new Explosion(
+          this.atlas.explosionFrames,
+          player.position.x,
+          player.position.z,
+        );
+        this.explosions.push(expl);
+        this.fxLayer.addChild(expl.container);
+      }
+      this.lastExplodedAt.set(player.id, player.explodedAt);
 
       if (player.id === localSid && !localFinished) {
         if (phase === 'racing') {
@@ -127,12 +149,23 @@ export class IsoScene {
       }
     }
 
+    // Tick & cull explosions.
+    for (let i = this.explosions.length - 1; i >= 0; i--) {
+      const expl = this.explosions[i]!;
+      expl.update(dt);
+      if (expl.done) {
+        expl.destroy();
+        this.explosions.splice(i, 1);
+      }
+    }
+
     // Cleanup bikes whose players left.
     for (const id of Array.from(this.bikes.keys())) {
       if (!activeIds.has(id)) {
         const view = this.bikes.get(id)!;
         view.destroy();
         this.bikes.delete(id);
+        this.lastExplodedAt.delete(id);
       }
     }
 
@@ -143,6 +176,8 @@ export class IsoScene {
     window.removeEventListener('resize', this.resizeListener);
     for (const view of this.bikes.values()) view.destroy();
     this.bikes.clear();
+    for (const expl of this.explosions) expl.destroy();
+    this.explosions = [];
     this.viewport.destroy();
   }
 }

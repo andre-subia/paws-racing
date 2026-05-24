@@ -3,6 +3,7 @@ import {
   Color,
   Graphics,
   Matrix,
+  Rectangle,
   Renderer,
   RenderTexture,
   Texture,
@@ -25,6 +26,8 @@ export interface SpriteAtlas {
   checkpointMarker: Texture;
   startMarker: Texture;
   shadow: Texture;
+  /** 9 explosion frames, each 128×128, sliced from /assets/explotion.png. */
+  explosionFrames: Texture[];
 }
 
 export async function buildAtlas(renderer: Renderer): Promise<SpriteAtlas> {
@@ -39,14 +42,32 @@ export async function buildAtlas(renderer: Renderer): Promise<SpriteAtlas> {
   const bikes: Record<string, Texture> = {};
   for (const [id, tex] of textures) bikes[id] = tex;
 
+  const explosionSheet = (await Assets.load('/assets/explotion.png')) as Texture;
+  explosionSheet.source.scaleMode = 'nearest';
+  const FRAME = 128;
+  const FRAMES = 9;
+  const explosionFrames: Texture[] = [];
+  for (let i = 0; i < FRAMES; i++) {
+    explosionFrames.push(
+      new Texture({
+        source: explosionSheet.source,
+        frame: new Rectangle(i * FRAME, 0, FRAME, FRAME),
+      }),
+    );
+  }
+
   return {
     bikes,
-    tile: buildTile(renderer, '#3b2470', '#52339c', '#1f0e3f'),
+    // Asphalt — calm slate gray with barely-visible edge lines so the iso
+    // grid stops creating a dizzying moire when scrolling at speed. The
+    // accent tiles (start line, boost pads) stay vivid to pop against it.
+    tile: buildTile(renderer, '#322f3c', '#3a3744', '#262330'),
     whiteTile: buildTile(renderer, '#f5f5f5', '#ffffff', '#b8b8b8'),
     boostTile: buildTile(renderer, '#ff3aa3', '#ff7ed3', '#7c1b54'),
     checkpointMarker: buildCheckpoint(renderer, '#9b59ff'),
     startMarker: buildCheckpoint(renderer, '#ffb142'),
     shadow: buildShadow(renderer),
+    explosionFrames,
   };
 }
 

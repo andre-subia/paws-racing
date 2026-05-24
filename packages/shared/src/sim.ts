@@ -16,10 +16,23 @@ export interface BikeState {
   vz: number;
   speed: number;
   drifting: boolean;
+  /** Outward speed (m/s) at which the bike hit the track wall this tick. 0
+   * otherwise. Transient — reset at the start of each stepBike call. */
+  wallImpact: number;
 }
 
 export function emptyBikeState(): BikeState {
-  return { x: 0, y: 0.5, z: 0, yaw: 0, vx: 0, vz: 0, speed: 0, drifting: false };
+  return {
+    x: 0,
+    y: 0.5,
+    z: 0,
+    yaw: 0,
+    vx: 0,
+    vz: 0,
+    speed: 0,
+    drifting: false,
+    wallImpact: 0,
+  };
 }
 
 /**
@@ -38,6 +51,8 @@ export function stepBike(
   spec: VehicleSpec,
   track?: TrackDef,
 ): void {
+  state.wallImpact = 0;
+
   const throttle = hasFlag(flags, INPUT_FLAGS.THROTTLE) ? 1 : 0;
   const brake = hasFlag(flags, INPUT_FLAGS.BRAKE) ? 1 : 0;
   const left = hasFlag(flags, INPUT_FLAGS.LEFT) ? 1 : 0;
@@ -88,6 +103,7 @@ export function clampToTrack(state: BikeState, track: TrackDef): void {
   if (outV > 0) {
     state.vx -= nx * outV;
     state.vz -= nz * outV;
+    if (outV > state.wallImpact) state.wallImpact = outV;
   }
 
   state.vx *= 0.88;

@@ -3,6 +3,8 @@ export interface RankRow {
   name: string;
   isLocal: boolean;
   finished: boolean;
+  exploded: boolean;
+  health: number;
 }
 
 interface HudProps {
@@ -18,6 +20,9 @@ interface HudProps {
   spectating: string | null;
   boostUntil: number;
   serverTime: number;
+  health: number;
+  exploded: boolean;
+  pingMs: number;
   onLeave: () => void;
 }
 
@@ -33,6 +38,9 @@ export function Hud({
   spectating,
   boostUntil,
   serverTime,
+  health,
+  exploded,
+  pingMs,
   onLeave,
 }: HudProps) {
   const boosting = boostUntil > 0 && boostUntil > serverTime;
@@ -74,6 +82,7 @@ export function Hud({
               : row.finished
                 ? 'text-white/45'
                 : 'text-white/85';
+            const badge = row.exploded ? '✕' : row.finished ? '✓' : null;
             return (
               <li
                 key={row.id}
@@ -81,9 +90,13 @@ export function Hud({
               >
                 <span className="w-4 text-right tabular-nums">{place}</span>
                 <span className="truncate">{row.name}</span>
-                {row.finished && (
-                  <span className="ml-auto text-[9px] uppercase tracking-widest text-neon-cyan/70">
-                    ✓
+                {badge && (
+                  <span
+                    className={`ml-auto text-[9px] uppercase tracking-widest ${
+                      row.exploded ? 'text-red-400/80' : 'text-neon-cyan/70'
+                    }`}
+                  >
+                    {badge}
                   </span>
                 )}
               </li>
@@ -102,11 +115,59 @@ export function Hud({
         </div>
       )}
 
-      {/* Top-right room code + player count. */}
+      {/* Top-right room code + player count + ping. */}
       <div className="absolute right-4 top-4 rounded-lg border-2 border-neon-magenta/40 bg-black/70 px-3 py-2 text-right">
         <div className="font-pixel text-xs text-neon-magenta">ROOM {roomCode ?? '…'}</div>
         <div className="font-pixel text-xs text-white/60">×{players}</div>
+        <div
+          className={`mt-0.5 font-pixel text-[10px] uppercase tracking-widest ${
+            pingMs > 200 ? 'text-red-400' : pingMs > 100 ? 'text-neon-orange' : 'text-white/60'
+          }`}
+        >
+          {pingMs > 0 ? `${pingMs} ms` : '— ms'}
+        </div>
       </div>
+
+      {/* Bottom-center big HP indicator (your own bike). Hidden in spectator. */}
+      {!isSpectator && (() => {
+        const hpPct = Math.max(0, Math.min(100, health));
+        // Green > 50%, yellow 20-50%, red < 20%.
+        const hpColor =
+          hpPct > 50 ? 'bg-green-500' : hpPct >= 20 ? 'bg-yellow-400' : 'bg-red-500';
+        const labelColor =
+          hpPct > 50 ? 'text-green-400' : hpPct >= 20 ? 'text-yellow-300' : 'text-red-400';
+        const borderColor =
+          hpPct > 50
+            ? 'border-green-500/40'
+            : hpPct >= 20
+              ? 'border-yellow-400/40'
+              : 'border-red-500/60';
+        return (
+          <div
+            className={`absolute bottom-6 left-1/2 -translate-x-1/2 rounded-lg border-2 bg-black/80 px-5 py-2.5 ${borderColor}`}
+          >
+            <div className="flex items-baseline gap-3">
+              <span className="font-pixel text-xs uppercase tracking-widest text-white/60">
+                HP
+              </span>
+              <span className={`font-pixel text-3xl tabular-nums ${labelColor}`}>
+                {Math.round(hpPct)}
+              </span>
+              <div className="h-3 w-[240px] overflow-hidden rounded-sm border border-white/10 bg-white/10">
+                <div
+                  className={`h-full transition-[width] duration-200 ${hpColor}`}
+                  style={{ width: `${hpPct}%` }}
+                />
+              </div>
+            </div>
+            {exploded && (
+              <div className="mt-1 text-center font-pixel text-[10px] uppercase tracking-widest text-red-400">
+                ✕ Wrecked — respawning…
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Bottom-right indicator: speed during the race, spectator banner after. */}
       {isSpectator ? (

@@ -26,6 +26,7 @@ export function RaceScene() {
   const [conn, setConn] = useState<ConnState>('connecting');
   const [error, setError] = useState<string | null>(null);
   const [, force] = useState(0);
+  const [pingMs, setPingMs] = useState(0);
 
   const pixiHostRef = useRef<HTMLDivElement | null>(null);
   const isoSceneRef = useRef<IsoScene | null>(null);
@@ -100,6 +101,22 @@ export function RaceScene() {
           setError(msg ?? 'room error');
           setConn('error');
         });
+
+        // Roundtrip ping: send our timestamp, server echoes, we measure ms.
+        room.onMessage('pong', (sentAt: number) => {
+          setPingMs(Math.round(performance.now() - sentAt));
+        });
+        const sendPing = () => {
+          try {
+            room.send('ping', performance.now());
+          } catch {
+            // Connection closed in the middle of the interval — ignore.
+          }
+        };
+        sendPing();
+        const pingInterval = window.setInterval(sendPing, 2000);
+        const stopPing = () => window.clearInterval(pingInterval);
+        room.onLeave(stopPing);
 
         inputCtrl = startInputLoop(room, prediction);
       } catch (e) {
@@ -201,6 +218,8 @@ export function RaceScene() {
       name: p.name,
       isLocal: p.id === room.sessionId,
       finished: finishIdx.has(p.id),
+      exploded: p.explodedAt > 0,
+      health: p.health,
     }));
   }, [room, playersArr, finishOrderIds, track]);
 
@@ -278,6 +297,9 @@ export function RaceScene() {
             spectating={spectatorTarget}
             boostUntil={localPlayer.boostUntil}
             serverTime={room.state.serverTime}
+            health={localPlayer.health}
+            exploded={localPlayer.explodedAt > 0}
+            pingMs={pingMs}
             onLeave={endRace}
           />
           <MiniMap trackId={trackId} players={playersArr} localSid={room.sessionId} />

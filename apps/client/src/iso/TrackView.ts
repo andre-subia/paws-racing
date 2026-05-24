@@ -3,7 +3,10 @@ import { Container, Sprite } from 'pixi.js';
 import { TILE_H, TILE_W, worldToScreen } from './projection.js';
 import type { SpriteAtlas } from './sprites.js';
 
-const TILE_STEP_WORLD = 2;
+// A 64×32 diamond covers exactly 1×1 world units, so the grid step must be
+// 1 for diamonds to share edges. Step 2 left a checkerboard of gaps that
+// strobed against the moving camera and felt dizzying.
+const TILE_STEP_WORLD = 1;
 // Tiles within ±this many world units of the start line plane get painted
 // white in a zebra pattern.
 const START_LINE_DEPTH = 1.2;

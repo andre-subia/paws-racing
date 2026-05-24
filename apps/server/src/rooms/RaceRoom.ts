@@ -63,6 +63,11 @@ export class RaceRoom extends Room<RaceState> {
   private bikeStates = new Map<string, BikeState>();
   private gateMem = new Map<string, GateMemory>();
   private boostCooldowns = new Map<string, BoostCooldowns>();
+  /** Cooldown so a player taking continuous wall damage doesn't insta-die. */
+  private wallHitAt = new Map<string, number>();
+  /** Pending respawn timestamps (server time, ms). Player is exploded until
+   * tick time >= this value; then bike teleports to nearest checkpoint. */
+  private respawnAt = new Map<string, number>();
 
   private track!: TrackDef;
   private finishedAt = 0; // serverTime when race finished, for hold-then-reset
@@ -121,6 +126,12 @@ export class RaceRoom extends Room<RaceState> {
       if (this.state.phase !== 'waiting') return;
       if (this.state.hostId !== client.sessionId) return;
       this.startCountdown();
+    });
+
+    // Ping/pong for round-trip latency display. Client sends its timestamp,
+    // server echoes it back, client measures the elapsed time.
+    this.onMessage('ping', (client, sentAt: number) => {
+      client.send('pong', sentAt);
     });
 
     this.setSimulationInterval((dtMs) => this.tick(dtMs / 1000), 1000 / SIM_HZ);
@@ -198,6 +209,8 @@ export class RaceRoom extends Room<RaceState> {
     this.bikeStates.delete(sid);
     this.gateMem.delete(sid);
     this.boostCooldowns.delete(sid);
+    this.wallHitAt.delete(sid);
+    this.respawnAt.delete(sid);
     if (this.state.hostId === sid) {
       const next = this.state.players.keys().next().value as string | undefined;
       this.state.hostId = next ?? '';
@@ -240,8 +253,12 @@ export class RaceRoom extends Room<RaceState> {
       player.position_rank = 0;
       player.boostUntil = 0;
       player.boostSpeed = 0;
+      player.health = 100;
+      player.explodedAt = 0;
       this.gateMem.set(sid, { lastSignedDist: -1 });
       this.boostCooldowns.set(sid, new Map());
+      this.wallHitAt.set(sid, 0);
+      this.respawnAt.delete(sid);
       slot += 1;
     }
     logger.info(
@@ -256,6 +273,47 @@ export class RaceRoom extends Room<RaceState> {
     logger.info({ room: this.roomId, code: this.state.code }, 'race finished');
   }
 
+  /**
+   * Mark a player as exploded and schedule a respawn 1.5s later (covers the
+   * client's explosion animation). Players are NOT pushed to finishOrder —
+   * they come back at the nearest checkpoint with full health.
+   */
+  private killPlayer(sid: string, player: PlayerState, now: number) {
+    player.health = 0;
+    player.explodedAt = now;
+    const bike = this.bikeStates.get(sid);
+    if (bike) {
+      bike.vx = 0;
+      bike.vz = 0;
+      bike.speed = 0;
+    }
+    this.respawnAt.set(sid, now + 1500);
+    // Drop any queued inputs so we don't replay them at the respawn point.
+    this.inputQueue.get(sid)?.splice(0);
+  }
+
+  /** Teleport the bike to the player's last passed checkpoint, full HP. */
+  private respawnPlayer(sid: string, player: PlayerState) {
+    const bike = this.bikeStates.get(sid);
+    if (!bike) return;
+    const cpIdx = Math.max(0, player.checkpoint);
+    const cp = this.track.checkpoints[cpIdx] ?? this.track.checkpoints[0]!;
+    bike.x = cp.center.x;
+    bike.y = this.track.surfaceY + 0.5;
+    bike.z = cp.center.z;
+    bike.yaw = cp.yaw;
+    bike.vx = 0;
+    bike.vz = 0;
+    bike.speed = 0;
+    bike.wallImpact = 0;
+    this.gateMem.set(sid, { lastSignedDist: -1 });
+    this.wallHitAt.set(sid, Date.now()); // grace from immediate wall damage
+    player.health = 100;
+    player.explodedAt = 0;
+    this.respawnAt.delete(sid);
+    syncToSchema(bike, player);
+  }
+
   private resetToLobby() {
     this.state.phase = 'waiting';
     this.state.countdownEndsAt = 0;
@@ -268,6 +326,8 @@ export class RaceRoom extends Room<RaceState> {
       p.position_rank = 0;
       p.boostUntil = 0;
       p.boostSpeed = 0;
+      p.health = 100;
+      p.explodedAt = 0;
       this.gateMem.set(sid, { lastSignedDist: -1 });
       this.boostCooldowns.set(sid, new Map());
     }
@@ -308,7 +368,8 @@ export class RaceRoom extends Room<RaceState> {
         ];
       const queue = this.inputQueue.get(sid);
 
-      if (!acceptInputs || player.finishedAt > 0 || !queue || queue.length === 0) {
+      const frozen = !acceptInputs || player.finishedAt > 0 || player.explodedAt > 0;
+      if (frozen || !queue || queue.length === 0) {
         stepBike(bike, 0, dt, spec, this.track);
       } else {
         const n = queue.length;
@@ -327,11 +388,52 @@ export class RaceRoom extends Room<RaceState> {
         player.boostUntil = 0;
         player.boostSpeed = 0;
       }
+
+      // Wall damage. clampToTrack writes the outward impact speed into
+      // bike.wallImpact when the bike crosses the track edge this tick.
+      // Only real crashes (>= WALL_HIT_THRESHOLD) bleed health, and a
+      // cooldown stops a stuck-against-the-wall bike from accumulating
+      // damage tick after tick.
+      const WALL_HIT_THRESHOLD = 9;
+      const WALL_COOLDOWN_MS = 700;
+      if (acceptInputs && bike.wallImpact > WALL_HIT_THRESHOLD && player.explodedAt === 0) {
+        const lastHit = this.wallHitAt.get(sid) ?? 0;
+        if (now - lastHit >= WALL_COOLDOWN_MS) {
+          this.wallHitAt.set(sid, now);
+          const dmg = Math.min(25, Math.max(6, (bike.wallImpact - 6) * 2));
+          player.health = Math.max(0, player.health - dmg);
+          if (player.health <= 0) this.killPlayer(sid, player, now);
+        }
+      }
     }
 
-    // Vehicle-vehicle collision (only during active race).
+    // Process pending respawns. Player stays exploded for ~1.5s, then we
+    // teleport them to the nearest passed checkpoint with full HP.
     if (acceptInputs) {
-      resolveBikeCollisions(Array.from(this.bikeStates.keys()), this.bikeStates);
+      for (const [sid, player] of this.state.players) {
+        const at = this.respawnAt.get(sid);
+        if (at && now >= at && player.explodedAt > 0) {
+          this.respawnPlayer(sid, player);
+        }
+      }
+    }
+
+    // Vehicle-vehicle collision (only during active race). Rear hits drain
+    // health; reaching 0 explodes the player (treated as a finish in the
+    // current finishOrder slot — usually last place).
+    if (acceptInputs) {
+      const hits = resolveBikeCollisions(
+        Array.from(this.bikeStates.keys()),
+        this.bikeStates,
+      );
+      for (const hit of hits) {
+        const victim = this.state.players.get(hit.victimId);
+        if (!victim || victim.finishedAt > 0 || victim.explodedAt > 0) continue;
+        // Rear-hits hurt — every clean tap should chunk meaningful health.
+        const dmg = Math.min(60, Math.max(18, hit.impactSpeed * 3.5 + 10));
+        victim.health = Math.max(0, victim.health - dmg);
+        if (victim.health <= 0) this.killPlayer(hit.victimId, victim, now);
+      }
     }
 
     // Checkpoints + laps + boost-pad triggers (race only).

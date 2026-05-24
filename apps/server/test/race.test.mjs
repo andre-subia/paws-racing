@@ -24,7 +24,7 @@ function fakePlayer() {
 
 /** A bike that we can teleport to specific positions for testing. */
 function fakeBike(x = 0, z = 0) {
-  return { x, y: 0.5, z, yaw: 0, vx: 0, vz: 0, speed: 0, drifting: false };
+  return { x, y: 0.5, z, yaw: 0, vx: 0, vz: 0, speed: 0, drifting: false, wallImpact: 0 };
 }
 
 /**
