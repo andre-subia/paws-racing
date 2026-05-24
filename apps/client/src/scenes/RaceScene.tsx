@@ -11,6 +11,11 @@ import { Hud } from '../ui/Hud.tsx';
 import { LobbyPanel } from '../ui/LobbyPanel.tsx';
 import { MiniMap } from '../ui/MiniMap.tsx';
 import { Results } from '../ui/Results.tsx';
+import { TouchControls } from '../ui/TouchControls.tsx';
+
+const IS_TOUCH =
+  typeof window !== 'undefined' &&
+  (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window);
 
 type ConnState = 'connecting' | 'connected' | 'error' | 'disconnected';
 
@@ -300,9 +305,16 @@ export function RaceScene() {
             health={localPlayer.health}
             exploded={localPlayer.explodedAt > 0}
             pingMs={pingMs}
+            compact={IS_TOUCH}
             onLeave={endRace}
           />
-          <MiniMap trackId={trackId} players={playersArr} localSid={room.sessionId} />
+          <MiniMap
+            trackId={trackId}
+            players={playersArr}
+            localSid={room.sessionId}
+            compact={IS_TOUCH}
+          />
+          {IS_TOUCH && !localFinished && <TouchControls />}
         </>
       )}
 

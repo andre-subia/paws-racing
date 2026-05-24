@@ -23,6 +23,9 @@ interface HudProps {
   health: number;
   exploded: boolean;
   pingMs: number;
+  /** Touch-device mode: smaller widgets, repositioned so they don't sit
+   * under the on-screen buttons. */
+  compact?: boolean;
   onLeave: () => void;
 }
 
@@ -41,6 +44,7 @@ export function Hud({
   health,
   exploded,
   pingMs,
+  compact = false,
   onLeave,
 }: HudProps) {
   const boosting = boostUntil > 0 && boostUntil > serverTime;
@@ -67,12 +71,18 @@ export function Hud({
       )}
 
       {/* Top-left live ranking. */}
-      <div className="absolute left-4 top-4 min-w-[180px] rounded-lg border-2 border-neon-cyan/40 bg-black/70 px-3 py-2">
+      <div
+        className={`absolute rounded-lg border-2 border-neon-cyan/40 bg-black/70 ${
+          compact
+            ? 'left-2 top-2 max-w-[140px] px-2 py-1.5'
+            : 'left-4 top-4 min-w-[180px] px-3 py-2'
+        }`}
+      >
         <div className="mb-1 flex items-baseline justify-between">
-          <span className="font-pixel text-xs uppercase tracking-widest text-white/70">
+          <span className="font-pixel text-[10px] uppercase tracking-widest text-white/70">
             Rank
           </span>
-          <span className="font-pixel text-[10px] text-white/40">{ranking.length}P</span>
+          <span className="font-pixel text-[9px] text-white/40">{ranking.length}P</span>
         </div>
         <ol className="space-y-0.5">
           {ranking.map((row, i) => {
@@ -107,20 +117,40 @@ export function Hud({
 
       {/* Top-center lap counter (hidden in spectator mode). */}
       {!isSpectator && (
-        <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-lg border-2 border-neon-cyan/40 bg-black/70 px-5 py-2 text-center">
-          <div className="font-pixel text-xs uppercase tracking-widest text-white/70">Lap</div>
-          <div className="font-pixel text-2xl text-neon-cyan">
+        <div
+          className={`absolute left-1/2 -translate-x-1/2 rounded-lg border-2 border-neon-cyan/40 bg-black/70 text-center ${
+            compact ? 'top-2 px-3 py-1' : 'top-4 px-5 py-2'
+          }`}
+        >
+          <div
+            className={`font-pixel uppercase tracking-widest text-white/70 ${
+              compact ? 'text-[9px]' : 'text-xs'
+            }`}
+          >
+            Lap
+          </div>
+          <div className={`font-pixel text-neon-cyan ${compact ? 'text-lg' : 'text-2xl'}`}>
             {Math.max(1, lap)}/{totalLaps}
           </div>
         </div>
       )}
 
       {/* Top-right room code + player count + ping. */}
-      <div className="absolute right-4 top-4 rounded-lg border-2 border-neon-magenta/40 bg-black/70 px-3 py-2 text-right">
-        <div className="font-pixel text-xs text-neon-magenta">ROOM {roomCode ?? '…'}</div>
-        <div className="font-pixel text-xs text-white/60">×{players}</div>
+      <div
+        className={`absolute rounded-lg border-2 border-neon-magenta/40 bg-black/70 text-right ${
+          compact ? 'right-2 top-2 px-2 py-1' : 'right-4 top-4 px-3 py-2'
+        }`}
+      >
+        <div className={`font-pixel text-neon-magenta ${compact ? 'text-[10px]' : 'text-xs'}`}>
+          ROOM {roomCode ?? '…'}
+        </div>
+        <div className={`font-pixel text-white/60 ${compact ? 'text-[9px]' : 'text-xs'}`}>
+          ×{players}
+        </div>
         <div
-          className={`mt-0.5 font-pixel text-[10px] uppercase tracking-widest ${
+          className={`mt-0.5 font-pixel uppercase tracking-widest ${
+            compact ? 'text-[9px]' : 'text-[10px]'
+          } ${
             pingMs > 200 ? 'text-red-400' : pingMs > 100 ? 'text-neon-orange' : 'text-white/60'
           }`}
         >
@@ -128,10 +158,9 @@ export function Hud({
         </div>
       </div>
 
-      {/* Bottom-center big HP indicator (your own bike). Hidden in spectator. */}
+      {/* Bottom-center HP indicator (your own bike). Hidden in spectator. */}
       {!isSpectator && (() => {
         const hpPct = Math.max(0, Math.min(100, health));
-        // Green > 50%, yellow 20-50%, red < 20%.
         const hpColor =
           hpPct > 50 ? 'bg-green-500' : hpPct >= 20 ? 'bg-yellow-400' : 'bg-red-500';
         const labelColor =
@@ -144,16 +173,30 @@ export function Hud({
               : 'border-red-500/60';
         return (
           <div
-            className={`absolute bottom-6 left-1/2 -translate-x-1/2 rounded-lg border-2 bg-black/80 px-5 py-2.5 ${borderColor}`}
+            className={`absolute left-1/2 -translate-x-1/2 rounded-lg border-2 bg-black/80 ${borderColor} ${
+              compact ? 'bottom-2 px-3 py-1.5' : 'bottom-6 px-5 py-2.5'
+            }`}
           >
             <div className="flex items-baseline gap-3">
-              <span className="font-pixel text-xs uppercase tracking-widest text-white/60">
+              <span
+                className={`font-pixel uppercase tracking-widest text-white/60 ${
+                  compact ? 'text-[10px]' : 'text-xs'
+                }`}
+              >
                 HP
               </span>
-              <span className={`font-pixel text-3xl tabular-nums ${labelColor}`}>
+              <span
+                className={`font-pixel tabular-nums ${labelColor} ${
+                  compact ? 'text-xl' : 'text-3xl'
+                }`}
+              >
                 {Math.round(hpPct)}
               </span>
-              <div className="h-3 w-[240px] overflow-hidden rounded-sm border border-white/10 bg-white/10">
+              <div
+                className={`overflow-hidden rounded-sm border border-white/10 bg-white/10 ${
+                  compact ? 'h-2 w-[140px]' : 'h-3 w-[240px]'
+                }`}
+              >
                 <div
                   className={`h-full transition-[width] duration-200 ${hpColor}`}
                   style={{ width: `${hpPct}%` }}
@@ -161,7 +204,7 @@ export function Hud({
               </div>
             </div>
             {exploded && (
-              <div className="mt-1 text-center font-pixel text-[10px] uppercase tracking-widest text-red-400">
+              <div className="mt-1 text-center font-pixel text-[9px] uppercase tracking-widest text-red-400">
                 ✕ Wrecked — respawning…
               </div>
             )}
@@ -169,26 +212,51 @@ export function Hud({
         );
       })()}
 
-      {/* Bottom-right indicator: speed during the race, spectator banner after. */}
+      {/* Bottom-right indicator: speed during the race, spectator banner after.
+       * In compact mode it sits higher so it stays clear of the GAS/BRK buttons. */}
       {isSpectator ? (
-        <div className="absolute bottom-6 right-6 rounded-lg border-2 border-neon-violet/60 bg-black/70 px-4 py-3 text-right">
-          <div className="font-pixel text-xs uppercase tracking-widest text-white/60">
+        <div
+          className={`absolute right-2 rounded-lg border-2 border-neon-violet/60 bg-black/70 text-right ${
+            compact ? 'bottom-44 px-2 py-1.5' : 'bottom-6 right-6 px-4 py-3'
+          }`}
+        >
+          <div
+            className={`font-pixel uppercase tracking-widest text-white/60 ${
+              compact ? 'text-[9px]' : 'text-xs'
+            }`}
+          >
             Spectating
           </div>
-          <div className="font-pixel text-xl text-neon-violet">{spectating}</div>
+          <div className={`font-pixel text-neon-violet ${compact ? 'text-sm' : 'text-xl'}`}>
+            {spectating}
+          </div>
         </div>
       ) : (
-        <div className="absolute bottom-6 right-6 rounded-lg border-2 border-neon-cyan/40 bg-black/70 px-4 py-3 text-right">
-          <div className="font-pixel text-xs uppercase tracking-widest text-white/60">
+        <div
+          className={`absolute right-2 rounded-lg border-2 border-neon-cyan/40 bg-black/70 text-right ${
+            compact ? 'bottom-44 px-2 py-1.5' : 'bottom-6 right-6 px-4 py-3'
+          }`}
+        >
+          <div
+            className={`font-pixel uppercase tracking-widest text-white/60 ${
+              compact ? 'text-[9px]' : 'text-xs'
+            }`}
+          >
             SPEED
           </div>
           <div
-            className={`font-pixel text-3xl ${boosting ? 'text-neon-orange' : 'text-neon-cyan'}`}
+            className={`font-pixel ${boosting ? 'text-neon-orange' : 'text-neon-cyan'} ${
+              compact ? 'text-xl' : 'text-3xl'
+            }`}
           >
             {Math.round(speed)}
           </div>
           {boosting && (
-            <div className="font-pixel text-xs uppercase tracking-widest text-neon-orange">
+            <div
+              className={`font-pixel uppercase tracking-widest text-neon-orange ${
+                compact ? 'text-[9px]' : 'text-xs'
+              }`}
+            >
               ▶ BOOST
             </div>
           )}

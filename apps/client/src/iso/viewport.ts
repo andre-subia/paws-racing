@@ -20,6 +20,7 @@ export class Viewport {
   private cameraZ = 0;
   private cameraOffsetX = 0;
   private cameraOffsetY = 0;
+  private zoom = 1;
 
   private constructor(app: Application) {
     this.app = app;
@@ -27,6 +28,12 @@ export class Viewport {
     this.overlay = new Container();
     app.stage.addChild(this.world);
     app.stage.addChild(this.overlay);
+  }
+
+  /** Set a static world zoom. <1 zooms out (more visible), >1 zooms in. */
+  setZoom(zoom: number) {
+    this.zoom = zoom;
+    this.applyCamera();
   }
 
   /**
@@ -60,9 +67,10 @@ export class Viewport {
   private applyCamera() {
     const p: ScreenPoint = { x: 0, y: 0 };
     worldToScreen(this.cameraX, this.cameraZ, p);
+    this.world.scale.set(this.zoom);
     // Integer snap to avoid sub-pixel jitter on pixel-art sprites.
-    this.world.x = Math.round(this.cameraOffsetX - p.x);
-    this.world.y = Math.round(this.cameraOffsetY - p.y);
+    this.world.x = Math.round(this.cameraOffsetX - p.x * this.zoom);
+    this.world.y = Math.round(this.cameraOffsetY - p.y * this.zoom);
   }
 
   private destroyed = false;

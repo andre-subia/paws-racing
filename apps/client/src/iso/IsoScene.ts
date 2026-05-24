@@ -26,6 +26,13 @@ export class IsoScene {
   static async create(deps: IsoSceneDeps): Promise<IsoScene> {
     const viewport = await Viewport.create(deps.parent);
     const atlas = await buildAtlas(viewport.app.renderer);
+    // On touch devices we pull the camera back so more of the track is
+    // visible — phones have less screen real estate and the on-screen
+    // controls cover the lower corners.
+    const isTouch =
+      typeof window !== 'undefined' &&
+      (window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window);
+    if (isTouch) viewport.setZoom(0.65);
     return new IsoScene(viewport, atlas, deps);
   }
 

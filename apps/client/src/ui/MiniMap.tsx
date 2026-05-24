@@ -5,13 +5,15 @@ interface MiniMapProps {
   trackId: string;
   players: PlayerState[];
   localSid: string;
+  /** Touch-device mode: smaller box, positioned above the steering buttons. */
+  compact?: boolean;
 }
 
 /**
  * Tiny corner radar. Draws the track loop as an SVG path and dots per player.
  * Re-renders on each state patch (cheap).
  */
-export function MiniMap({ trackId, players, localSid }: MiniMapProps) {
+export function MiniMap({ trackId, players, localSid, compact = false }: MiniMapProps) {
   const track = useMemo(() => getTrack(trackId), [trackId]);
 
   const { vbX, vbY, vbW, vbH, pathData } = useMemo(() => {
@@ -36,14 +38,24 @@ export function MiniMap({ trackId, players, localSid }: MiniMapProps) {
     return { vbX: x0, vbY: z0, vbW: w, vbH: h, pathData: `${pts} Z` };
   }, [track]);
 
+  const w = compact ? 110 : 220;
+  const h = compact ? 70 : 150;
   return (
-    <div className="pointer-events-none absolute bottom-4 left-4 rounded border-2 border-neon-cyan/60 bg-black/80 p-3">
-      <div className="mb-1 font-pixel text-[10px] uppercase tracking-widest text-neon-cyan/70">
+    <div
+      className={`pointer-events-none absolute rounded border-2 border-neon-cyan/60 bg-black/80 ${
+        compact ? 'bottom-28 left-2 p-1.5' : 'bottom-4 left-4 p-3'
+      }`}
+    >
+      <div
+        className={`mb-1 font-pixel uppercase tracking-widest text-neon-cyan/70 ${
+          compact ? 'text-[8px]' : 'text-[10px]'
+        }`}
+      >
         Map
       </div>
       <svg
-        width="220"
-        height="150"
+        width={w}
+        height={h}
         viewBox={`${vbX} ${vbY} ${vbW} ${vbH}`}
         className="block"
       >

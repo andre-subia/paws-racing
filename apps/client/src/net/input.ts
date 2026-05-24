@@ -16,6 +16,19 @@ const KEY_MAP: Record<string, number> = {
   KeyB: INPUT_FLAGS.LOOK_BACK,
 };
 
+/** Module-level flag set for touch controls. UI components mutate this via
+ * `setTouchFlag`; the input loop merges it with keyboard state each tick. */
+const touchFlags = new Set<number>();
+
+export function setTouchFlag(flag: number, pressed: boolean): void {
+  if (pressed) touchFlags.add(flag);
+  else touchFlags.delete(flag);
+}
+
+export function clearTouchFlags(): void {
+  touchFlags.clear();
+}
+
 export interface InputController {
   stop: () => void;
 }
@@ -44,6 +57,7 @@ export function startInputLoop(room: Room, prediction: PredictionController): In
   const interval = window.setInterval(() => {
     let flags = 0;
     for (const code of pressed) flags |= KEY_MAP[code] ?? 0;
+    for (const f of touchFlags) flags |= f;
     seq += 1;
     tick += 1;
     prediction.applyInput(seq, flags);
@@ -55,6 +69,7 @@ export function startInputLoop(room: Room, prediction: PredictionController): In
       window.clearInterval(interval);
       window.removeEventListener('keydown', onDown);
       window.removeEventListener('keyup', onUp);
+      touchFlags.clear();
     },
   };
 }
