@@ -22,6 +22,8 @@ export class PlayerState extends Schema {
   @type('boolean') ready = false;
   @type('boolean') host = false;
   @type('boolean') connected = true;
+  /** True for AI-controlled racers (no real client behind them). */
+  @type('boolean') isBot = false;
 
   // Network/sim
   @type('number') lastSeq = 0;

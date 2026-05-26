@@ -20,9 +20,7 @@ export interface JoinOptions {
  * carry an empty `code` so filterBy(['code']) distinguishes them from private
  * rooms (which have a non-empty code).
  */
-export async function quickRace(
-  options: JoinOptions & { bots?: number },
-): Promise<Room<RaceState>> {
+export async function quickRace(options: JoinOptions): Promise<Room<RaceState>> {
   return getClient().joinOrCreate<RaceState>(ROOM_NAMES.RACE, { ...options, code: '' });
 }
 

@@ -82,45 +82,13 @@ export function MainMenu() {
 
         {mode === 'home' && (
           <div className="flex flex-col gap-5">
-            <div className="flex items-center justify-between rounded-md border-2 border-white/15 bg-white/5 px-3 py-2">
-              <span className="text-sm uppercase tracking-widest text-white/70">Bots</span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setBots((n) => clampBots(n - 1))}
-                  className="rounded-md border-2 border-white/30 bg-white/5 px-3 py-0.5 text-lg hover:border-white/50"
-                >
-                  −
-                </button>
-                <span className="w-6 text-center font-pixel text-xl text-neon-cyan">{bots}</span>
-                <button
-                  type="button"
-                  onClick={() => setBots((n) => clampBots(n + 1))}
-                  className="rounded-md border-2 border-white/30 bg-white/5 px-3 py-0.5 text-lg hover:border-white/50"
-                >
-                  +
-                </button>
-              </div>
-            </div>
-
             <button
               type="button"
               disabled={!canPlay}
-              onClick={() => startRace({ kind: 'quick', bots })}
+              onClick={() => startRace({ kind: 'quick' })}
               className="px-btn cyan w-full"
             >
               ▶ Quick Race
-            </button>
-
-            <button
-              type="button"
-              disabled={!canPlay}
-              onClick={() =>
-                startRace({ kind: 'create', trackId, laps, bots: bots > 0 ? bots : 7 })
-              }
-              className="px-btn w-full"
-            >
-              🤖 Solo vs Bots
             </button>
 
             <div className="grid grid-cols-2 gap-5">

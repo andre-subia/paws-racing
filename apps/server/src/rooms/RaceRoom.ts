@@ -95,6 +95,8 @@ export class RaceRoom extends Room<RaceState> {
   private botSkill = new Map<string, number>();
   /** Bots requested at create time, spawned once the host joins. */
   private pendingBots = 0;
+  /** Monotonic counter for unique bot session ids across add/remove. */
+  private botSeq = 0;
 
   private track!: TrackDef;
   private finishedAt = 0; // serverTime when race finished, for hold-then-reset
@@ -148,6 +150,12 @@ export class RaceRoom extends Room<RaceState> {
       if (this.state.phase !== 'waiting') return;
       if (this.state.hostId !== client.sessionId) return;
       this.state.laps = clampLaps(payload.laps);
+    });
+
+    this.onMessage('bots', (client, payload: { count: number }) => {
+      if (this.state.phase !== 'waiting') return;
+      if (this.state.hostId !== client.sessionId) return;
+      this.setBotCount(clampBots(payload?.count));
     });
 
     this.onMessage('start', (client) => {
@@ -208,42 +216,66 @@ export class RaceRoom extends Room<RaceState> {
 
     // Fill the grid with AI opponents once the host has taken their slot.
     if (player.host && this.pendingBots > 0) {
-      this.spawnBots(this.pendingBots);
+      this.setBotCount(this.pendingBots);
       this.pendingBots = 0;
     }
   }
 
-  /** Create `count` AI racers as regular players, placed on the next grid slots. */
-  private spawnBots(count: number) {
+  /** Humans currently in the room (everyone that isn't an AI racer). */
+  private humanCount(): number {
+    return this.state.players.size - this.bots.size;
+  }
+
+  /**
+   * Add or remove bots so exactly `target` AI racers are present, clamped so
+   * the grid never exceeds the room capacity. Host-controllable from the lobby.
+   */
+  private setBotCount(target: number) {
+    const maxBots = Math.max(0, MAX_PLAYERS_PER_ROOM - this.humanCount());
+    const desired = Math.min(maxBots, Math.max(0, Math.round(target)));
+    while (this.bots.size < desired) this.addBot();
+    while (this.bots.size > desired) this.removeLastBot();
+  }
+
+  /** Spawn a single AI racer on the next free grid slot. */
+  private addBot() {
+    if (this.state.players.size >= MAX_PLAYERS_PER_ROOM) return;
+    this.botSeq += 1;
+    const sid = `bot-${this.botSeq}`;
+    const idx = this.bots.size;
     const vehicleIds = Object.keys(VEHICLES) as VehicleId[];
-    for (let i = 0; i < count; i++) {
-      const sid = `bot-${i + 1}`;
-      const player = new PlayerState();
-      player.id = sid;
-      player.name = BOT_NAMES[i % BOT_NAMES.length]!;
-      player.vehicle = vehicleIds[i % vehicleIds.length]!;
-      player.host = false;
-      player.ready = true;
-      player.connected = true;
+    const player = new PlayerState();
+    player.id = sid;
+    player.name = BOT_NAMES[idx % BOT_NAMES.length]!;
+    player.vehicle = vehicleIds[idx % vehicleIds.length]!;
+    player.host = false;
+    player.ready = true;
+    player.connected = true;
+    player.isBot = true;
 
-      const slot = this.state.players.size;
-      const spawn =
-        this.track.spawnPoints[slot] ?? this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
-      const bike = emptyBikeState();
-      bike.x = spawn.x;
-      bike.y = this.track.surfaceY + 0.5;
-      bike.z = spawn.z;
-      bike.yaw = spawn.yaw;
-      this.bikeStates.set(sid, bike);
-      this.gateMem.set(sid, { lastSignedDist: -1 });
-      this.boostCooldowns.set(sid, new Map());
-      this.bots.add(sid);
-      this.botSkill.set(sid, 0.78 + Math.random() * 0.22);
+    const slot = this.state.players.size;
+    const spawn =
+      this.track.spawnPoints[slot] ?? this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
+    const bike = emptyBikeState();
+    bike.x = spawn.x;
+    bike.y = this.track.surfaceY + 0.5;
+    bike.z = spawn.z;
+    bike.yaw = spawn.yaw;
+    this.bikeStates.set(sid, bike);
+    this.gateMem.set(sid, { lastSignedDist: -1 });
+    this.boostCooldowns.set(sid, new Map());
+    this.bots.add(sid);
+    this.botSkill.set(sid, 0.78 + Math.random() * 0.22);
 
-      syncToSchema(bike, player);
-      this.state.players.set(sid, player);
-    }
-    logger.info({ room: this.roomId, code: this.state.code, bots: count }, 'bots spawned');
+    syncToSchema(bike, player);
+    this.state.players.set(sid, player);
+  }
+
+  /** Remove the most recently added bot (Set keeps insertion order). */
+  private removeLastBot() {
+    let last: string | undefined;
+    for (const id of this.bots) last = id;
+    if (last) this.removePlayer(last);
   }
 
   override async onLeave(client: Client, consented: boolean) {

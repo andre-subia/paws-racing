@@ -20,10 +20,13 @@ interface LobbyPanelProps {
   phase: 'waiting' | 'countdown' | 'racing' | 'finished';
   trackId: string;
   laps: number;
+  botCount: number;
+  maxBots: number;
   onToggleReady: () => void;
   onPickVehicle: (v: VehicleId) => void;
   onPickTrack: (t: TrackId) => void;
   onPickLaps: (n: number) => void;
+  onPickBots: (n: number) => void;
   onStart: () => void;
   onLeave: () => void;
 }
@@ -39,10 +42,13 @@ export function LobbyPanel({
   phase,
   trackId,
   laps,
+  botCount,
+  maxBots,
   onToggleReady,
   onPickVehicle,
   onPickTrack,
   onPickLaps,
+  onPickBots,
   onStart,
   onLeave,
 }: LobbyPanelProps) {
@@ -65,6 +71,7 @@ export function LobbyPanel({
   if (!showLobby) return null;
 
   const clampLaps = (n: number) => Math.min(LAPS_MAX, Math.max(LAPS_MIN, Math.round(n)));
+  const clampBots = (n: number) => Math.min(maxBots, Math.max(0, Math.round(n)));
 
   return (
     <div className="synth-bg absolute inset-0 flex items-center justify-center overflow-hidden">
@@ -161,6 +168,28 @@ export function LobbyPanel({
               <button
                 type="button"
                 onClick={() => isHost && onPickLaps(clampLaps(laps + 1))}
+                disabled={!isHost}
+                className="rounded border-2 border-white/30 bg-white/5 px-2 py-0.5 text-sm hover:border-white/50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                +
+              </button>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-[10px] uppercase tracking-widest text-white/50">Bots</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => isHost && onPickBots(clampBots(botCount - 1))}
+                disabled={!isHost}
+                className="rounded border-2 border-white/30 bg-white/5 px-2 py-0.5 text-sm hover:border-white/50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                −
+              </button>
+              <span className="w-8 text-center font-pixel text-lg text-neon-cyan">{botCount}</span>
+              <button
+                type="button"
+                onClick={() => isHost && onPickBots(clampBots(botCount + 1))}
                 disabled={!isHost}
                 className="rounded border-2 border-white/30 bg-white/5 px-2 py-0.5 text-sm hover:border-white/50 disabled:cursor-not-allowed disabled:opacity-40"
               >

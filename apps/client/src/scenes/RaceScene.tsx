@@ -1,4 +1,10 @@
-import { type PlayerState, type RaceState, type VehicleId, getTrack } from '@paws/shared';
+import {
+  MAX_PLAYERS_PER_ROOM,
+  type PlayerState,
+  type RaceState,
+  type VehicleId,
+  getTrack,
+} from '@paws/shared';
 import { type Room, getStateCallbacks } from 'colyseus.js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { IsoScene } from '../iso/IsoScene.ts';
@@ -51,7 +57,7 @@ export function RaceScene() {
         let room: Room<RaceState>;
         switch (joinIntent.kind) {
           case 'quick':
-            room = await quickRace({ name, vehicle, bots: joinIntent.bots });
+            room = await quickRace({ name, vehicle });
             break;
           case 'create':
             room = await createRoom({
@@ -198,6 +204,9 @@ export function RaceScene() {
   const localPlayer = room?.state?.players?.get(room.sessionId);
   const isHost = !!localPlayer?.host;
 
+  const botCount = playersArr.filter((p) => p.isBot).length;
+  const maxBots = MAX_PLAYERS_PER_ROOM - (playersArr.length - botCount);
+
   const finishOrderIds = useMemo(
     () => (room?.state?.finishOrder ? Array.from(room.state.finishOrder) : []),
     // biome-ignore lint/correctness/useExhaustiveDependencies: re-derive on every forced render
@@ -270,6 +279,8 @@ export function RaceScene() {
           phase={phase}
           trackId={room.state.trackId}
           laps={room.state.laps}
+          botCount={botCount}
+          maxBots={maxBots}
           onToggleReady={() => room.send('ready', {})}
           onPickVehicle={(v) => {
             setVehicle(v);
@@ -277,6 +288,7 @@ export function RaceScene() {
           }}
           onPickTrack={(t) => room.send('track', { trackId: t })}
           onPickLaps={(n) => room.send('laps', { laps: n })}
+          onPickBots={(n) => room.send('bots', { count: n })}
           onStart={() => room.send('start', {})}
           onLeave={endRace}
         />
@@ -292,10 +304,13 @@ export function RaceScene() {
           phase={phase}
           trackId={room.state.trackId}
           laps={room.state.laps}
+          botCount={0}
+          maxBots={0}
           onToggleReady={() => undefined}
           onPickVehicle={() => undefined}
           onPickTrack={() => undefined}
           onPickLaps={() => undefined}
+          onPickBots={() => undefined}
           onStart={() => undefined}
           onLeave={endRace}
         />

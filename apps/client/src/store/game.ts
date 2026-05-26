@@ -3,7 +3,7 @@ import { create } from 'zustand';
 
 export type Scene = 'landing' | 'menu' | 'race';
 export type JoinIntent =
-  | { kind: 'quick'; bots?: number }
+  | { kind: 'quick' }
   | { kind: 'create'; trackId: TrackId; laps: number; bots?: number }
   | { kind: 'join'; code: string };
 
