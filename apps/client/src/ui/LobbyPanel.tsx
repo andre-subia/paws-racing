@@ -1,11 +1,4 @@
-import {
-  LAPS_MAX,
-  LAPS_MIN,
-  TRACKS,
-  type TrackId,
-  VEHICLES,
-  type VehicleId,
-} from '@paws/shared';
+import { LAPS_MAX, LAPS_MIN, TRACKS, type TrackId, VEHICLES, type VehicleId } from '@paws/shared';
 import { TrackThumb } from './components/TrackThumb.tsx';
 import { VehicleThumb } from './components/VehicleThumb.tsx';
 
@@ -15,6 +8,7 @@ interface LobbyPlayer {
   vehicle: string;
   ready: boolean;
   host: boolean;
+  score: number;
 }
 
 interface LobbyPanelProps {
@@ -91,29 +85,36 @@ export function LobbyPanel({
         </div>
 
         <div className="mb-4 rounded border border-white/10 bg-black/40">
-          {players.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between border-b border-white/5 px-4 py-2 last:border-b-0"
-            >
-              <div className="flex items-center gap-3">
-                <span
-                  className={`inline-block h-2 w-2 rounded-full ${
-                    p.ready || p.host ? 'bg-neon-cyan' : 'bg-white/30'
-                  }`}
-                />
-                <span className="text-lg">{p.name}</span>
-                {p.host && (
-                  <span className="rounded bg-neon-magenta/20 px-2 py-0.5 text-xs uppercase tracking-widest text-neon-magenta">
-                    Host
+          {[...players]
+            .sort((a, b) => b.score - a.score)
+            .map((p) => (
+              <div
+                key={p.id}
+                className="flex items-center justify-between border-b border-white/5 px-4 py-2 last:border-b-0"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`inline-block h-2 w-2 rounded-full ${
+                      p.ready || p.host ? 'bg-neon-cyan' : 'bg-white/30'
+                    }`}
+                  />
+                  <span className="text-lg">{p.name}</span>
+                  {p.host && (
+                    <span className="rounded bg-neon-magenta/20 px-2 py-0.5 text-xs uppercase tracking-widest text-neon-magenta">
+                      Host
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-white/60">
+                    {VEHICLES[p.vehicle as VehicleId]?.label ?? p.vehicle}
                   </span>
-                )}
+                  <span className="font-pixel text-xs tabular-nums text-neon-yellow">
+                    ★ {p.score}
+                  </span>
+                </div>
               </div>
-              <div className="text-sm text-white/60">
-                {VEHICLES[p.vehicle as VehicleId]?.label ?? p.vehicle}
-              </div>
-            </div>
-          ))}
+            ))}
         </div>
 
         {/* Track + laps — only the host can edit; everyone sees the values. */}

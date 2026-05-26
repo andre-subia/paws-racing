@@ -46,6 +46,10 @@ export class PlayerState extends Schema {
   // takes the player out of the race (treated like a finish in last place).
   @type('number') health = 100;
   @type('number') explodedAt = 0;
+
+  // Cumulative room score — points awarded by finish position, persisting
+  // across races in the same room (a mini-championship).
+  @type('number') score = 0;
 }
 
 export class RaceState extends Schema {

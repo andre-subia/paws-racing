@@ -23,6 +23,7 @@ import {
 } from '@paws/shared';
 import { generateCode, normalizeCode } from '../codes.js';
 import { logger } from '../logger.js';
+import { computeBotInput } from '../sim/bot.js';
 import {
   advanceCheckpoint,
   type BoostCooldowns,
@@ -37,11 +38,30 @@ interface JoinOptions {
   code?: string;
   trackId?: string;
   laps?: number;
+  /** Number of AI opponents to fill the grid with (host's create option). */
+  bots?: number;
 }
+
+/** Themed names for the AI racers, cycled if more bots than names. */
+const BOT_NAMES = [
+  'Mittens',
+  'Shadow',
+  'Tobermory',
+  'Biscuit',
+  'Pixel',
+  'Salem',
+  'Nitro',
+  'Whiskers',
+];
 
 function clampLaps(v: unknown): number {
   const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : LAPS_DEFAULT;
   return Math.min(LAPS_MAX, Math.max(LAPS_MIN, n));
+}
+
+function clampBots(v: unknown): number {
+  const n = typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : 0;
+  return Math.min(MAX_PLAYERS_PER_ROOM - 1, Math.max(0, n));
 }
 
 function isValidTrackId(id: unknown): id is TrackId {
@@ -69,6 +89,13 @@ export class RaceRoom extends Room<RaceState> {
    * tick time >= this value; then bike teleports to nearest checkpoint. */
   private respawnAt = new Map<string, number>();
 
+  /** Session ids of AI-controlled racers (no real client behind them). */
+  private bots = new Set<string>();
+  /** Per-bot driving skill in 0..1 — higher carries more corner speed. */
+  private botSkill = new Map<string, number>();
+  /** Bots requested at create time, spawned once the host joins. */
+  private pendingBots = 0;
+
   private track!: TrackDef;
   private finishedAt = 0; // serverTime when race finished, for hold-then-reset
 
@@ -81,6 +108,7 @@ export class RaceRoom extends Room<RaceState> {
     this.track = getTrack(options.trackId ?? this.state.trackId);
     this.state.trackId = this.track.id;
     this.state.laps = clampLaps(options.laps);
+    this.pendingBots = clampBots(options.bots);
 
     this.setPatchRate(1000 * BROADCAST_DT);
 
@@ -153,8 +181,7 @@ export class RaceRoom extends Room<RaceState> {
 
     const slot = this.state.players.size;
     const spawn =
-      this.track.spawnPoints[slot] ??
-      this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
+      this.track.spawnPoints[slot] ?? this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
     const bike = emptyBikeState();
     bike.x = spawn.x;
     bike.y = this.track.surfaceY + 0.5;
@@ -178,6 +205,45 @@ export class RaceRoom extends Room<RaceState> {
       },
       'player joined',
     );
+
+    // Fill the grid with AI opponents once the host has taken their slot.
+    if (player.host && this.pendingBots > 0) {
+      this.spawnBots(this.pendingBots);
+      this.pendingBots = 0;
+    }
+  }
+
+  /** Create `count` AI racers as regular players, placed on the next grid slots. */
+  private spawnBots(count: number) {
+    const vehicleIds = Object.keys(VEHICLES) as VehicleId[];
+    for (let i = 0; i < count; i++) {
+      const sid = `bot-${i + 1}`;
+      const player = new PlayerState();
+      player.id = sid;
+      player.name = BOT_NAMES[i % BOT_NAMES.length]!;
+      player.vehicle = vehicleIds[i % vehicleIds.length]!;
+      player.host = false;
+      player.ready = true;
+      player.connected = true;
+
+      const slot = this.state.players.size;
+      const spawn =
+        this.track.spawnPoints[slot] ?? this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
+      const bike = emptyBikeState();
+      bike.x = spawn.x;
+      bike.y = this.track.surfaceY + 0.5;
+      bike.z = spawn.z;
+      bike.yaw = spawn.yaw;
+      this.bikeStates.set(sid, bike);
+      this.gateMem.set(sid, { lastSignedDist: -1 });
+      this.boostCooldowns.set(sid, new Map());
+      this.bots.add(sid);
+      this.botSkill.set(sid, 0.78 + Math.random() * 0.22);
+
+      syncToSchema(bike, player);
+      this.state.players.set(sid, player);
+    }
+    logger.info({ room: this.roomId, code: this.state.code, bots: count }, 'bots spawned');
   }
 
   override async onLeave(client: Client, consented: boolean) {
@@ -211,8 +277,18 @@ export class RaceRoom extends Room<RaceState> {
     this.boostCooldowns.delete(sid);
     this.wallHitAt.delete(sid);
     this.respawnAt.delete(sid);
+    this.bots.delete(sid);
+    this.botSkill.delete(sid);
     if (this.state.hostId === sid) {
-      const next = this.state.players.keys().next().value as string | undefined;
+      // Hand host to the next human; bots can't host (and the room
+      // auto-disposes once the last real client is gone anyway).
+      let next: string | undefined;
+      for (const key of this.state.players.keys()) {
+        if (!this.bots.has(key)) {
+          next = key;
+          break;
+        }
+      }
       this.state.hostId = next ?? '';
       if (next) {
         const p = this.state.players.get(next);
@@ -234,8 +310,7 @@ export class RaceRoom extends Room<RaceState> {
     let slot = 0;
     for (const [sid, player] of this.state.players) {
       const spawn =
-        this.track.spawnPoints[slot] ??
-        this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
+        this.track.spawnPoints[slot] ?? this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
       const bike = this.bikeStates.get(sid) ?? emptyBikeState();
       bike.x = spawn.x;
       bike.y = this.track.surfaceY + 0.5;
@@ -270,6 +345,14 @@ export class RaceRoom extends Room<RaceState> {
   private finishRace() {
     this.state.phase = 'finished';
     this.finishedAt = Date.now();
+    // Award championship points by finish position: 1st gets N, last gets 1
+    // (N = number of racers that finished). Accumulates across races in the
+    // room. By now every player has been pushed to finishOrder.
+    const total = this.state.finishOrder.length;
+    this.state.finishOrder.forEach((id, i) => {
+      const p = this.state.players.get(id);
+      if (p) p.score += total - i;
+    });
     logger.info({ room: this.roomId, code: this.state.code }, 'race finished');
   }
 
@@ -319,7 +402,8 @@ export class RaceRoom extends Room<RaceState> {
     this.state.countdownEndsAt = 0;
     this.state.finishOrder.clear();
     for (const [sid, p] of this.state.players) {
-      p.ready = false;
+      // Bots are always ready so the host can immediately re-start.
+      p.ready = this.bots.has(sid);
       p.lap = 0;
       p.checkpoint = -1;
       p.finishedAt = 0;
@@ -369,7 +453,13 @@ export class RaceRoom extends Room<RaceState> {
       const queue = this.inputQueue.get(sid);
 
       const frozen = !acceptInputs || player.finishedAt > 0 || player.explodedAt > 0;
-      if (frozen || !queue || queue.length === 0) {
+      if (this.bots.has(sid)) {
+        // AI racers: drive toward a look-ahead point on the centerline.
+        const flags = frozen
+          ? 0
+          : computeBotInput(this.track, bike, spec, this.botSkill.get(sid) ?? 0.9);
+        stepBike(bike, flags, dt, spec, this.track);
+      } else if (frozen || !queue || queue.length === 0) {
         stepBike(bike, 0, dt, spec, this.track);
       } else {
         const n = queue.length;
@@ -422,10 +512,7 @@ export class RaceRoom extends Room<RaceState> {
     // health; reaching 0 explodes the player (treated as a finish in the
     // current finishOrder slot — usually last place).
     if (acceptInputs) {
-      const hits = resolveBikeCollisions(
-        Array.from(this.bikeStates.keys()),
-        this.bikeStates,
-      );
+      const hits = resolveBikeCollisions(Array.from(this.bikeStates.keys()), this.bikeStates);
       for (const hit of hits) {
         const victim = this.state.players.get(hit.victimId);
         if (!victim || victim.finishedAt > 0 || victim.explodedAt > 0) continue;

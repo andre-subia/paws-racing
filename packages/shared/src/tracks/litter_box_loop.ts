@@ -43,10 +43,10 @@ function spawnPoints(): SpawnPoint[] {
   const sideZ = fwdX;
   const out: SpawnPoint[] = [];
   for (let i = 0; i < MAX_PLAYERS_PER_ROOM; i++) {
-    const row = i % 2;
-    const col = Math.floor(i / 2);
-    const back = 4 + col * 4;
-    const lateral = -3 + row * 3;
+    const col = i % 4; // 0..3 abreast across the start line
+    const row = Math.floor(i / 4); // 0..1 rows back
+    const back = 4 + row * 5;
+    const lateral = -4.5 + col * 3;
     out.push({
       x: built.startX - fwdX * back + sideX * lateral,
       z: built.startZ - fwdZ * back + sideZ * lateral,

@@ -51,7 +51,7 @@ export function RaceScene() {
         let room: Room<RaceState>;
         switch (joinIntent.kind) {
           case 'quick':
-            room = await quickRace({ name, vehicle });
+            room = await quickRace({ name, vehicle, bots: joinIntent.bots });
             break;
           case 'create':
             room = await createRoom({
@@ -59,6 +59,7 @@ export function RaceScene() {
               vehicle,
               trackId: joinIntent.trackId,
               laps: joinIntent.laps,
+              bots: joinIntent.bots,
             });
             break;
           case 'join':
@@ -208,6 +209,14 @@ export function RaceScene() {
     const finishIdx = new Map<string, number>();
     finishOrderIds.forEach((id, i) => finishIdx.set(id, i));
     const cpCount = track.checkpoints.length;
+    // Squared distance from a player to the gate they're driving toward —
+    // used to order racers who share the same lap+checkpoint (smaller = ahead).
+    const distToNextGate = (p: PlayerState) => {
+      const next = track.checkpoints[(p.checkpoint + 1 + cpCount) % cpCount]!.center;
+      const dx = p.position.x - next.x;
+      const dz = p.position.z - next.z;
+      return dx * dx + dz * dz;
+    };
     const sorted = [...playersArr].sort((a, b) => {
       const af = finishIdx.get(a.id);
       const bf = finishIdx.get(b.id);
@@ -216,7 +225,8 @@ export function RaceScene() {
       if (bf !== undefined) return 1;
       const aProg = a.lap * cpCount + Math.max(0, a.checkpoint);
       const bProg = b.lap * cpCount + Math.max(0, b.checkpoint);
-      return bProg - aProg;
+      if (bProg !== aProg) return bProg - aProg;
+      return distToNextGate(a) - distToNextGate(b);
     });
     return sorted.map((p) => ({
       id: p.id,
@@ -226,7 +236,10 @@ export function RaceScene() {
       exploded: p.explodedAt > 0,
       health: p.health,
     }));
-  }, [room, playersArr, finishOrderIds, track]);
+    // `room.state.tick` advances every broadcast, so the board re-sorts live
+    // as racers gain ground — not only when someone crosses the finish line.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: tick drives the live re-sort
+  }, [room, playersArr, finishOrderIds, track, room?.state?.tick]);
 
   const localFinished = (localPlayer?.finishedAt ?? 0) > 0;
   const spectatorTarget = useMemo(() => {
@@ -249,6 +262,7 @@ export function RaceScene() {
             vehicle: p.vehicle,
             ready: p.ready,
             host: p.host,
+            score: p.score,
           }))}
           localSid={room.sessionId}
           isHost={isHost}
@@ -314,8 +328,13 @@ export function RaceScene() {
             localSid={room.sessionId}
             compact={IS_TOUCH}
           />
-          {IS_TOUCH && !localFinished && <TouchControls />}
         </>
+      )}
+
+      {/* On-screen controls stay mounted through the countdown so the player's
+       * thumbs are already on GAS/steer when the lights go green. */}
+      {room && IS_TOUCH && (phase === 'countdown' || (phase === 'racing' && !localFinished)) && (
+        <TouchControls />
       )}
 
       {phase === 'finished' && room && (
@@ -353,31 +372,40 @@ export function RaceScene() {
   );
 }
 
-function buildResults(
-  players: PlayerState[],
-  localSid: string,
-  state: RaceState,
-): Array<{ rank: number; name: string; finishedAt: number; isLocal: boolean; vehicle: string }> {
+interface ResultRow {
+  rank: number;
+  name: string;
+  finishedAt: number;
+  isLocal: boolean;
+  vehicle: string;
+  /** Points earned this race (1st = N … last = 1). */
+  points: number;
+  /** Cumulative room score, including this race. */
+  score: number;
+}
+
+function buildResults(players: PlayerState[], localSid: string, state: RaceState): ResultRow[] {
   const finishedIds = Array.from(state.finishOrder);
-  const finished = finishedIds.map((id, i) => {
+  // Ordered list of everyone: finishers first (in finish order), then any
+  // stragglers by track progress. Points mirror the server award.
+  const ordered: PlayerState[] = [];
+  for (const id of finishedIds) {
     const p = players.find((pp) => pp.id === id);
-    return {
-      rank: i + 1,
-      name: p?.name ?? '???',
-      finishedAt: p?.finishedAt ?? 0,
-      isLocal: id === localSid,
-      vehicle: p?.vehicle ?? '',
-    };
-  });
-  const unfinishedSorted = players
-    .filter((p) => p.finishedAt === 0)
+    if (p) ordered.push(p);
+  }
+  const stragglers = players
+    .filter((p) => !finishedIds.includes(p.id))
     .sort((a, b) => b.lap * 100 + b.checkpoint - (a.lap * 100 + a.checkpoint));
-  const unfinished = unfinishedSorted.map((p, i) => ({
-    rank: finished.length + i + 1,
+  ordered.push(...stragglers);
+
+  const total = ordered.length;
+  return ordered.map((p, i) => ({
+    rank: i + 1,
     name: p.name,
-    finishedAt: 0,
+    finishedAt: p.finishedAt,
     isLocal: p.id === localSid,
     vehicle: p.vehicle,
+    points: total - i,
+    score: p.score,
   }));
-  return [...finished, ...unfinished];
 }

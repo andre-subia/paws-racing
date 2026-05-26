@@ -20,7 +20,9 @@ export interface JoinOptions {
  * carry an empty `code` so filterBy(['code']) distinguishes them from private
  * rooms (which have a non-empty code).
  */
-export async function quickRace(options: JoinOptions): Promise<Room<RaceState>> {
+export async function quickRace(
+  options: JoinOptions & { bots?: number },
+): Promise<Room<RaceState>> {
   return getClient().joinOrCreate<RaceState>(ROOM_NAMES.RACE, { ...options, code: '' });
 }
 
@@ -30,7 +32,7 @@ export async function quickRace(options: JoinOptions): Promise<Room<RaceState>> 
  * original create options — a server-side code wouldn't be in those options.
  */
 export async function createRoom(
-  options: JoinOptions & { trackId?: TrackId; laps?: number },
+  options: JoinOptions & { trackId?: TrackId; laps?: number; bots?: number },
 ): Promise<Room<RaceState>> {
   const code = generateCode();
   return getClient().create<RaceState>(ROOM_NAMES.RACE, { ...options, code });

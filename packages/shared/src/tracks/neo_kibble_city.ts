@@ -87,11 +87,11 @@ function spawnPoints(): SpawnPoint[] {
   // start. Forward is -z, so "behind" means z > STRAIGHT/2.
   const out: SpawnPoint[] = [];
   for (let i = 0; i < MAX_PLAYERS_PER_ROOM; i++) {
-    const row = i % 2;
-    const col = Math.floor(i / 2);
+    const col = i % 4; // 0..3 abreast across the start line (along x)
+    const row = Math.floor(i / 4); // 0..1 rows back (along +z)
     out.push({
-      x: -3 + row * 3,
-      z: STRAIGHT / 2 + 4 + col * 4,
+      x: -4.5 + col * 3,
+      z: STRAIGHT / 2 + 4 + row * 5,
       yaw: 0, // bike faces -z (forward heading)
     });
   }

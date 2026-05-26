@@ -72,11 +72,11 @@ function spawnPoints(): SpawnPoint[] {
   const startZ = -RADIUS;
   const out: SpawnPoint[] = [];
   for (let i = 0; i < MAX_PLAYERS_PER_ROOM; i++) {
-    const row = i % 2;
-    const col = Math.floor(i / 2);
+    const col = i % 4; // 0..3 abreast across the start line (along z)
+    const row = Math.floor(i / 4); // 0..1 rows back (along -x)
     out.push({
-      x: startX - 4 - col * 4,
-      z: startZ - 3 + row * 3,
+      x: startX - 4 - row * 5,
+      z: startZ - 4.5 + col * 3,
       yaw: -Math.PI / 2,
     });
   }
