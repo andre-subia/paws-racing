@@ -53,10 +53,10 @@ export function Hud({
 
   return (
     <div className="pointer-events-none absolute inset-0 select-none">
-      {/* Goal banner — dimmed after lap 1. Hidden while spectating. */}
-      {!isSpectator && (
+      {/* Goal banner — dimmed after lap 1. Hidden while spectating / on mobile. */}
+      {!isSpectator && !compact && (
         <div
-          className={`absolute left-1/2 top-20 -translate-x-1/2 rounded-lg border-2 border-neon-orange/60 bg-black/70 px-4 py-2 text-center transition-opacity ${
+          className={`hud-box orange absolute left-1/2 top-20 -translate-x-1/2 px-4 py-2 text-center transition-opacity ${
             lap > 1 ? 'opacity-40' : 'opacity-100'
           }`}
         >
@@ -72,7 +72,7 @@ export function Hud({
 
       {/* Top-left live ranking. */}
       <div
-        className={`absolute rounded-lg border-2 border-neon-cyan/40 bg-black/70 ${
+        className={`hud-box absolute ${
           compact
             ? 'left-2 top-2 max-w-[140px] px-2 py-1.5'
             : 'left-4 top-4 min-w-[180px] px-3 py-2'
@@ -118,7 +118,7 @@ export function Hud({
       {/* Top-center lap counter (hidden in spectator mode). */}
       {!isSpectator && (
         <div
-          className={`absolute left-1/2 -translate-x-1/2 rounded-lg border-2 border-neon-cyan/40 bg-black/70 text-center ${
+          className={`hud-box absolute left-1/2 -translate-x-1/2 text-center ${
             compact ? 'top-2 px-3 py-1' : 'top-4 px-5 py-2'
           }`}
         >
@@ -137,7 +137,7 @@ export function Hud({
 
       {/* Top-right room code + player count + ping. */}
       <div
-        className={`absolute rounded-lg border-2 border-neon-magenta/40 bg-black/70 text-right ${
+        className={`hud-box magenta absolute text-right ${
           compact ? 'right-2 top-2 px-2 py-1' : 'right-4 top-4 px-3 py-2'
         }`}
       >
@@ -165,16 +165,13 @@ export function Hud({
           hpPct > 50 ? 'bg-green-500' : hpPct >= 20 ? 'bg-yellow-400' : 'bg-red-500';
         const labelColor =
           hpPct > 50 ? 'text-green-400' : hpPct >= 20 ? 'text-yellow-300' : 'text-red-400';
-        const borderColor =
-          hpPct > 50
-            ? 'border-green-500/40'
-            : hpPct >= 20
-              ? 'border-yellow-400/40'
-              : 'border-red-500/60';
+        const hpBox = hpPct > 50 ? 'green' : hpPct >= 20 ? 'yellow' : 'red';
         return (
           <div
-            className={`absolute left-1/2 -translate-x-1/2 rounded-lg border-2 bg-black/80 ${borderColor} ${
-              compact ? 'bottom-2 px-3 py-1.5' : 'bottom-6 px-5 py-2.5'
+            className={`hud-box ${hpBox} absolute ${
+              compact
+                ? 'bottom-28 left-6 px-2 py-1'
+                : 'bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5'
             }`}
           >
             <div className="flex items-baseline gap-3">
@@ -216,8 +213,8 @@ export function Hud({
        * In compact mode it sits higher so it stays clear of the GAS/BRK buttons. */}
       {isSpectator ? (
         <div
-          className={`absolute right-2 rounded-lg border-2 border-neon-violet/60 bg-black/70 text-right ${
-            compact ? 'bottom-44 px-2 py-1.5' : 'bottom-6 right-6 px-4 py-3'
+          className={`hud-box violet absolute right-2 text-right ${
+            compact ? 'top-24 px-2 py-1' : 'bottom-6 right-6 px-4 py-3'
           }`}
         >
           <div
@@ -233,8 +230,8 @@ export function Hud({
         </div>
       ) : (
         <div
-          className={`absolute right-2 rounded-lg border-2 border-neon-cyan/40 bg-black/70 text-right ${
-            compact ? 'bottom-44 px-2 py-1.5' : 'bottom-6 right-6 px-4 py-3'
+          className={`hud-box absolute right-2 text-right ${
+            compact ? 'top-24 px-2 py-1' : 'bottom-6 right-6 px-4 py-3'
           }`}
         >
           <div

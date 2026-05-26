@@ -1,7 +1,7 @@
 import type { TrackId, VehicleId } from '@paws/shared';
 import { create } from 'zustand';
 
-export type Scene = 'menu' | 'race';
+export type Scene = 'landing' | 'menu' | 'race';
 export type JoinIntent =
   | { kind: 'quick' }
   | { kind: 'create'; trackId: TrackId; laps: number }
@@ -23,7 +23,7 @@ const stored = (key: string, fallback: string) =>
   (typeof window !== 'undefined' && window.localStorage.getItem(key)) || fallback;
 
 export const useGame = create<GameStore>((set) => ({
-  scene: 'menu',
+  scene: 'landing',
   name: stored('paws.name', 'Racer'),
   vehicle: (stored('paws.vehicle', 'scout') as VehicleId) ?? 'scout',
   joinIntent: null,

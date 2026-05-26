@@ -21,10 +21,15 @@ export function MainMenu() {
   const clampLaps = (n: number) => Math.min(LAPS_MAX, Math.max(LAPS_MIN, Math.round(n)));
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-ink via-[#180b35] to-[#0b0418]">
-      <div className="w-[440px] rounded-2xl border-2 border-neon-cyan/40 bg-black/60 p-8 shadow-[0_0_60px_rgba(66,245,224,0.25)]">
-        <h1 className="mb-1 font-pixel text-3xl tracking-tight text-neon-cyan">PAWS RACING</h1>
-        <p className="mb-8 text-sm text-white/60">Online voxel arcade racing.</p>
+    <div className="synth-bg absolute inset-0 flex items-center justify-center overflow-hidden">
+      <div className="mode7-bg" />
+      <div className="px-card relative z-10 w-[460px] max-w-[92vw] p-7">
+        <h1 className="mb-1 font-pixel text-2xl tracking-tight text-neon-magenta drop-shadow-[2px_2px_0_#000]">
+          PAWS<span className="text-neon-yellow">/</span>RACING
+        </h1>
+        <p className="mb-7 font-pixel text-[10px] uppercase tracking-widest text-neon-cyan">
+          Online arcade cat racer
+        </p>
 
         <label className="mb-4 block">
           <span className="mb-1 block text-sm uppercase tracking-widest text-white/70">
@@ -60,31 +65,31 @@ export function MainMenu() {
         </div>
 
         {mode === 'home' && (
-          <div className="space-y-3">
+          <div className="flex flex-col gap-5">
             <button
               type="button"
               disabled={!canPlay}
               onClick={() => startRace({ kind: 'quick' })}
-              className="w-full rounded-md border-2 border-neon-cyan bg-neon-cyan/20 px-4 py-3 text-lg uppercase tracking-widest text-neon-cyan transition hover:bg-neon-cyan/30 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-white/5 disabled:text-white/30"
+              className="px-btn cyan w-full"
             >
-              Quick Race
+              ▶ Quick Race
             </button>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-5">
               <button
                 type="button"
                 disabled={!canPlay}
                 onClick={() => setMode('create')}
-                className="rounded-md border-2 border-neon-magenta bg-neon-magenta/15 px-3 py-2 text-sm uppercase tracking-widest text-neon-magenta transition hover:bg-neon-magenta/25 disabled:cursor-not-allowed disabled:opacity-40"
+                className="px-btn"
               >
-                Create Private
+                Create
               </button>
               <button
                 type="button"
                 onClick={() => setMode('join')}
-                className="rounded-md border-2 border-neon-violet bg-neon-violet/15 px-3 py-2 text-sm uppercase tracking-widest text-neon-violet transition hover:bg-neon-violet/25"
+                className="px-btn violet"
               >
-                Join by Code
+                Join Code
               </button>
             </div>
           </div>
@@ -141,19 +146,15 @@ export function MainMenu() {
                 {LAPS_MIN}–{LAPS_MAX} laps
               </p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setMode('home')}
-                className="rounded-md border-2 border-white/30 bg-white/5 px-3 py-2 text-sm uppercase tracking-widest hover:border-white/50"
-              >
+            <div className="grid grid-cols-2 gap-5 pt-1">
+              <button type="button" onClick={() => setMode('home')} className="px-btn ghost">
                 Back
               </button>
               <button
                 type="button"
                 disabled={!canPlay}
                 onClick={() => startRace({ kind: 'create', trackId, laps })}
-                className="rounded-md border-2 border-neon-magenta bg-neon-magenta/20 px-3 py-2 text-sm uppercase tracking-widest text-neon-magenta transition hover:bg-neon-magenta/30 disabled:cursor-not-allowed disabled:opacity-40"
+                className="px-btn"
               >
                 Create
               </button>
@@ -174,19 +175,15 @@ export function MainMenu() {
                 className="w-full rounded-md border-2 border-neon-violet/40 bg-black/50 px-3 py-2 text-center text-2xl tracking-[0.5em] uppercase outline-none focus:border-neon-violet"
               />
             </label>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setMode('home')}
-                className="rounded-md border-2 border-white/30 bg-white/5 px-3 py-2 text-sm uppercase tracking-widest hover:border-white/50"
-              >
+            <div className="grid grid-cols-2 gap-5 pt-1">
+              <button type="button" onClick={() => setMode('home')} className="px-btn ghost">
                 Back
               </button>
               <button
                 type="button"
                 disabled={!canJoin}
                 onClick={() => startRace({ kind: 'join', code: sanitizedCode })}
-                className="rounded-md border-2 border-neon-violet bg-neon-violet/20 px-3 py-2 text-sm uppercase tracking-widest text-neon-violet transition hover:bg-neon-violet/30 disabled:cursor-not-allowed disabled:opacity-40"
+                className="px-btn violet"
               >
                 Join
               </button>
@@ -194,7 +191,9 @@ export function MainMenu() {
           </div>
         )}
 
-        <p className="mt-4 text-center text-xs text-white/40">WASD to steer • Space to drift</p>
+        <p className="mt-5 text-center font-pixel text-[9px] uppercase tracking-widest text-white/40">
+          WASD steer · Space drift
+        </p>
       </div>
     </div>
   );

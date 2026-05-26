@@ -1,0 +1,730 @@
+/* Paws Racing landing page — ported from the Claude Design handoff, scoped
+ * under .lp so it never touches the in-game HUD. Pixel/synthwave aesthetic. */
+
+.lp {
+  --bg: #0a0420;
+  --ink: #f6e9ff;
+  --pink: #ff2dd1;
+  --cyan: #00e8ff;
+  --purple: #8a2cff;
+  --orange: #ff7a1a;
+  --yellow: #ffd400;
+  --green: #3bff7a;
+  --red: #ff2e4d;
+
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  color: var(--ink);
+  font-family: 'VT323', ui-monospace, monospace;
+  font-size: 22px;
+  line-height: 1.25;
+  -webkit-font-smoothing: none;
+  background:
+    radial-gradient(1200px 700px at 50% -10%, #2a0e6e 0%, transparent 60%),
+    radial-gradient(900px 600px at 90% 30%, #4b0d5a 0%, transparent 60%),
+    linear-gradient(180deg, #0a0420 0%, #06021a 100%);
+}
+.lp * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+.lp img,
+.lp svg {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.lp h1,
+.lp h2,
+.lp h3,
+.lp h4 {
+  font-family: 'Press Start 2P', monospace;
+  letter-spacing: 0.02em;
+}
+.lp a {
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+/* CRT scanlines + vignette (scoped, not on body) */
+.lp .crt-overlay {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 2px, transparent 2px 4px),
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+  mix-blend-mode: multiply;
+}
+
+/* ---------- pixel button ---------- */
+.lp .pbtn {
+  --c: var(--pink);
+  --c2: #a30c83;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  color: #fff;
+  background: var(--c);
+  padding: 18px 22px;
+  border: 0;
+  cursor: pointer;
+  text-transform: uppercase;
+  box-shadow:
+    0 -4px 0 0 var(--c), 0 4px 0 0 var(--c2), -4px 0 0 0 var(--c), 4px 0 0 0 var(--c),
+    0 8px 0 0 #000, -4px 4px 0 0 #000, 4px 4px 0 0 #000, -4px -4px 0 0 #000, 4px -4px 0 0 #000;
+  transition: transform 80ms steps(2), filter 200ms;
+}
+.lp .pbtn:hover {
+  filter: brightness(1.15) saturate(1.2);
+  transform: translateY(-2px);
+}
+.lp .pbtn:active {
+  transform: translateY(2px);
+}
+.lp .pbtn.cyan {
+  --c: var(--cyan);
+  --c2: #066c87;
+  color: #022;
+}
+.lp .pbtn.yellow {
+  --c: var(--yellow);
+  --c2: #a87900;
+  color: #221700;
+}
+.lp .pbtn.ghost {
+  --c: #1a0a44;
+  --c2: #000;
+  color: #fff;
+}
+
+/* ---------- nav ---------- */
+.lp nav.top {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: linear-gradient(180deg, rgba(10, 4, 32, 0.95), rgba(10, 4, 32, 0.7));
+  border-bottom: 4px solid #000;
+  box-shadow: 0 4px 0 #ff2dd133, 0 8px 0 #00e8ff22;
+}
+.lp nav.top .row {
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+}
+.lp nav.top .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  color: #fff;
+}
+.lp nav.top .brand .mark {
+  width: 28px;
+  height: 28px;
+  background: conic-gradient(from 0deg at 50% 50%, var(--pink), var(--cyan), var(--yellow), var(--pink));
+  box-shadow: 0 0 0 4px #000, 0 0 0 8px #fff;
+}
+.lp nav.top ul {
+  list-style: none;
+  display: flex;
+  gap: 28px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #cdb6ff;
+}
+.lp nav.top ul a:hover {
+  color: var(--yellow);
+}
+.lp .blink {
+  animation: lp-blink 1s steps(2) infinite;
+}
+@keyframes lp-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+/* ---------- hero ---------- */
+.lp .hero {
+  position: relative;
+  height: 700px;
+  overflow: hidden;
+  isolation: isolate;
+}
+.lp .hero .sky {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: linear-gradient(
+    180deg,
+    #0a0420 0%, #2c0a52 35%, #6c1c7a 55%, #ff2d7d 70%,
+    #ff7a1a 80%, #ffd400 86%, #2c0a52 88%, #0a0420 100%
+  );
+}
+.lp .hero .sun {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  width: 360px;
+  height: 360px;
+  border-radius: 50%;
+  z-index: 1;
+  background: repeating-linear-gradient(
+    180deg,
+    #ffd400 0 14px, transparent 14px 18px, #ff7a1a 18px 32px, transparent 32px 36px,
+    #ff2dd1 36px 56px, transparent 56px 62px, #8a2cff 62px 92px, transparent 92px 100px, #ff2d7d 100px 200px
+  );
+  mask: radial-gradient(circle, #000 50%, transparent 51%);
+  -webkit-mask: radial-gradient(circle, #000 50%, transparent 51%);
+  filter: drop-shadow(0 0 40px #ff2dd1aa);
+  animation: lp-sun 5s ease-in-out infinite;
+}
+@keyframes lp-sun {
+  0%, 100% { filter: drop-shadow(0 0 40px #ff2dd1aa); }
+  50% { filter: drop-shadow(0 0 80px #ff7a1aaa); }
+}
+.lp .hero .mountains {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 44%;
+  width: 100%;
+  height: 150px;
+  z-index: 2;
+}
+/* Hero Mode-7 floor — the moving perspective grid behind the sun, modeled on
+ * the proven .mode7-bg. Bright green lines + a top fade so it reads as floor
+ * at hero scale (the sky stays pure sky above it). */
+.lp .hero .hero-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 56%;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+  perspective: 420px;
+}
+.lp .hero .hero-floor::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 260%;
+  height: 220%;
+  transform: translateX(-50%) rotateX(74deg);
+  transform-origin: top center;
+  background-image:
+    linear-gradient(0deg, var(--pink) 0 3px, transparent 3px),
+    linear-gradient(90deg, var(--pink) 0 3px, transparent 3px);
+  background-size: 80px 80px;
+  animation: lp-grid 1.4s linear infinite;
+  filter: drop-shadow(0 0 6px #ff2dd1cc);
+  opacity: 0.95;
+}
+.lp .hero .hero-floor::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, #0a0420 0%, transparent 45%, transparent 100%);
+}
+@keyframes lp-grid {
+  from { background-position: 0 0; }
+  to { background-position: 0 80px; }
+}
+.lp .hero .content {
+  position: relative;
+  z-index: 5;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 64px 24px 0;
+  text-align: center;
+}
+.lp .logo-arcade {
+  display: inline-block;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 76px;
+  line-height: 1;
+  color: #fff;
+  letter-spacing: 6px;
+  transform: perspective(600px) rotateX(8deg);
+  text-shadow:
+    4px 0 0 #000, -4px 0 0 #000, 0 4px 0 #000, 0 -4px 0 #000,
+    4px 4px 0 #000, -4px 4px 0 #000, 4px -4px 0 #000, -4px -4px 0 #000,
+    0 8px 0 var(--pink), 0 12px 0 var(--pink), 0 16px 0 #000,
+    4px 16px 0 #000, -4px 16px 0 #000, 0 20px 30px rgba(255, 45, 209, 0.45);
+}
+.lp .logo-arcade .a2 {
+  color: var(--yellow);
+  text-shadow:
+    4px 0 0 #000, -4px 0 0 #000, 0 4px 0 #000, 0 -4px 0 #000,
+    4px 4px 0 #000, -4px 4px 0 #000, 4px -4px 0 #000, -4px -4px 0 #000,
+    0 8px 0 var(--orange), 0 12px 0 var(--orange), 0 16px 0 #000,
+    4px 16px 0 #000, -4px 16px 0 #000, 0 20px 30px rgba(255, 122, 26, 0.45);
+}
+.lp .tagline {
+  margin-top: 32px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: var(--cyan);
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 8px #00e8ff80, 2px 2px 0 #000;
+}
+.lp .tagline .sep {
+  color: var(--pink);
+}
+.lp .cta-row {
+  margin-top: 128px;
+  display: flex;
+  gap: 28px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.lp .insert-coin {
+  margin-top: 32px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 16px;
+  color: var(--yellow);
+  animation: lp-blink 1s steps(2) infinite;
+}
+.lp .hero .hero-cat {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%) scaleX(-1);
+  width: 280px;
+  height: auto;
+  z-index: 6;
+  pointer-events: none;
+  filter: drop-shadow(0 0 24px #ff2dd1aa);
+  animation: lp-hover 1.6s ease-in-out infinite;
+}
+@keyframes lp-hover {
+  0%, 100% { transform: translateX(-50%) scaleX(-1) translateY(0); }
+  50% { transform: translateX(-50%) scaleX(-1) translateY(-8px); }
+}
+
+/* ---------- marquee ---------- */
+.lp .strip {
+  background: #000;
+  border-top: 4px solid var(--pink);
+  border-bottom: 4px solid var(--cyan);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.lp .marquee {
+  display: inline-block;
+  padding: 12px 0;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: #fff;
+  animation: lp-marquee 22s linear infinite;
+}
+.lp .marquee em {
+  color: var(--yellow);
+  font-style: normal;
+}
+.lp .marquee span {
+  color: var(--pink);
+  margin: 0 14px;
+}
+@keyframes lp-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* ---------- section blocks ---------- */
+.lp .block {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 80px 24px;
+}
+.lp .eyebrow {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  color: #cdb6ff;
+  margin-bottom: 14px;
+}
+.lp .eyebrow::before {
+  content: '// ';
+  color: var(--pink);
+}
+.lp h2.section-title {
+  font-size: 32px;
+  color: #fff;
+  margin-bottom: 44px;
+  line-height: 1.2;
+  text-shadow:
+    3px 0 0 #000, -3px 0 0 #000, 0 3px 0 #000, 0 -3px 0 #000,
+    0 6px 0 var(--purple), 0 10px 0 #000;
+}
+.lp h2.section-title .accent {
+  color: var(--yellow);
+}
+
+/* ---------- features ---------- */
+.lp .features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+.lp .feat {
+  padding: 24px;
+  background: #1a0a44;
+  border: 4px solid #000;
+  box-shadow: 0 0 0 4px #fff, 0 0 0 8px #000, 6px 6px 0 8px #000;
+  transition: transform 120ms steps(2);
+}
+.lp .feat:hover {
+  transform: translate(-3px, -3px);
+}
+.lp .feat .icon {
+  width: 56px;
+  height: 56px;
+  margin-bottom: 16px;
+}
+.lp .feat h3 {
+  font-size: 13px;
+  color: var(--yellow);
+  margin-bottom: 12px;
+  text-shadow: 2px 2px 0 #000;
+}
+.lp .feat p {
+  font-size: 20px;
+  color: #cdb6ff;
+  line-height: 1.3;
+}
+
+/* ---------- riders ---------- */
+.lp .chars-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 28px;
+}
+.lp .char {
+  background: #0e0530;
+  border: 4px solid #000;
+  box-shadow: 0 0 0 4px var(--cyan), 0 0 0 8px #000;
+  transition: transform 120ms steps(2);
+}
+.lp .char:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 4px var(--pink), 0 0 0 8px #000;
+}
+.lp .char .portrait {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 4px solid #000;
+  background: repeating-linear-gradient(135deg, #2a0e6e 0 8px, #1a0a44 8px 16px);
+}
+.lp .char .portrait img {
+  width: 88%;
+  height: auto;
+  filter: drop-shadow(0 0 12px #00000088);
+}
+.lp .char .meta {
+  padding: 16px;
+}
+.lp .char .name {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px;
+  color: #fff;
+  margin-bottom: 8px;
+  text-shadow: 2px 2px 0 #000;
+}
+.lp .char .rarity {
+  display: inline-block;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 4px 6px;
+  margin-bottom: 12px;
+  background: #000;
+}
+.lp .char .rarity.s { color: var(--yellow); }
+.lp .char .rarity.a { color: var(--cyan); }
+.lp .char .rarity.b { color: var(--green); }
+.lp .char .stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.lp .char .stat .label {
+  width: 52px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: #a78fdf;
+}
+.lp .char .stat .bar {
+  flex: 1;
+  height: 10px;
+  background: #000;
+  border: 2px solid #fff;
+}
+.lp .char .stat .bar i {
+  display: block;
+  height: 100%;
+  background: repeating-linear-gradient(90deg, var(--pink) 0 6px, #c01a9a 6px 8px);
+}
+.lp .char .stat .bar.cy i {
+  background: repeating-linear-gradient(90deg, var(--cyan) 0 6px, #066c87 6px 8px);
+}
+.lp .char .stat .bar.yl i {
+  background: repeating-linear-gradient(90deg, var(--yellow) 0 6px, #a87900 6px 8px);
+}
+.lp .char .stat .bar.gr i {
+  background: repeating-linear-gradient(90deg, var(--green) 0 6px, #1f8f44 6px 8px);
+}
+
+/* ---------- gameplay CRT ---------- */
+.lp .crt-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+}
+.lp .crt {
+  background: linear-gradient(180deg, #2a2030 0%, #1a1320 100%);
+  border-radius: 18px;
+  padding: 24px;
+  position: relative;
+  box-shadow: inset 0 0 0 4px #0a0810, inset 0 0 0 8px #4a3d55, 0 12px 0 #000, 0 14px 0 #ff2dd166;
+}
+.lp .crt::before {
+  content: '';
+  position: absolute;
+  right: 24px;
+  top: 24px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red), 0 0 0 2px #000;
+  animation: lp-blink 1.6s steps(2) infinite;
+}
+.lp .crt .label {
+  position: absolute;
+  left: 24px;
+  top: 18px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  color: #9a8caa;
+}
+.lp .crt .screen {
+  margin-top: 24px;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #2a0e6e 0%, #0a0420 70%, #000 100%);
+  box-shadow: inset 0 0 60px #000, inset 0 0 0 2px #000;
+}
+.lp .crt .screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.4) 0 2px, transparent 2px 4px),
+    radial-gradient(ellipse at 50% 40%, transparent 50%, rgba(0, 0, 0, 0.7) 100%);
+}
+.lp .crt .hud {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  padding: 16px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.lp .crt .hud .top,
+.lp .crt .hud .bot {
+  display: flex;
+  justify-content: space-between;
+}
+.lp .crt .hud .lap { color: var(--yellow); text-shadow: 2px 2px 0 #000; }
+.lp .crt .hud .pos { color: var(--pink); text-shadow: 2px 2px 0 #000; }
+.lp .crt .hud .time { color: var(--cyan); text-shadow: 2px 2px 0 #000; }
+.lp .crt .hud .speed { color: #fff; font-size: 22px; text-shadow: 0 0 8px var(--cyan), 2px 2px 0 #000; }
+.lp .crt .hud .speed span { font-size: 10px; color: var(--cyan); }
+.lp .crt .game { position: absolute; inset: 0; z-index: 1; overflow: hidden; }
+/* Mode-7 perspective road — shared by the CRT screens AND the hero. */
+.lp .road {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 300%;
+  height: 60%;
+  perspective: 300px;
+}
+.lp .road::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 100%;
+  height: 300%;
+  transform: translateX(-50%) rotateX(70deg);
+  transform-origin: top center;
+  background-image:
+    linear-gradient(0deg, var(--pink) 0 2px, transparent 2px),
+    linear-gradient(90deg, var(--pink) 0 2px, transparent 2px);
+  background-size: 40px 40px;
+  animation: lp-grid 0.9s linear infinite;
+}
+.lp .crt .game .horizon-sun {
+  position: absolute;
+  left: 50%;
+  top: 34%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: repeating-linear-gradient(
+    180deg, var(--yellow) 0 6px, transparent 6px 9px, var(--orange) 9px 18px, transparent 18px 22px, var(--pink) 22px 60px
+  );
+  mask: radial-gradient(circle, #000 50%, transparent 51%);
+  -webkit-mask: radial-gradient(circle, #000 50%, transparent 51%);
+}
+.lp .crt-secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.lp .crt.mini { padding: 18px; }
+.lp .crt.mini .screen { aspect-ratio: 16 / 10; margin-top: 18px; }
+.lp .crt.mini .hud { font-size: 8px; padding: 10px; }
+.lp .crt.mini .hud .speed { font-size: 14px; }
+
+/* ---------- tracks ---------- */
+.lp .tracks-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+.lp .track {
+  background: #0e0530;
+  border: 4px solid #000;
+  box-shadow: 0 0 0 4px #fff, 0 0 0 8px #000;
+  overflow: hidden;
+  transition: transform 120ms steps(2);
+}
+.lp .track:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 0 0 4px var(--yellow), 0 0 0 8px #000;
+}
+.lp .track .thumb {
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 4px solid #000;
+  background: radial-gradient(ellipse at 50% 40%, #2a0e6e 0%, #0a0420 80%);
+}
+.lp .track .meta { padding: 14px; }
+.lp .track .num { font-family: 'Press Start 2P', monospace; font-size: 8px; color: var(--cyan); margin-bottom: 6px; }
+.lp .track .name { font-family: 'Press Start 2P', monospace; font-size: 11px; color: #fff; margin-bottom: 8px; line-height: 1.2; text-shadow: 2px 2px 0 #000; }
+.lp .track .diff { display: flex; gap: 3px; }
+.lp .track .diff i { width: 10px; height: 10px; background: #000; border: 1px solid #444; }
+.lp .track .diff i.on { background: var(--red); border-color: #fff; }
+
+/* ---------- footer ---------- */
+.lp footer {
+  border-top: 4px solid #000;
+  box-shadow: 0 -4px 0 var(--pink);
+  background: #06021a;
+  margin-top: 40px;
+}
+.lp footer .inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 48px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 40px;
+  justify-content: space-between;
+}
+.lp footer h4 {
+  font-size: 11px;
+  color: var(--cyan);
+  margin-bottom: 14px;
+}
+.lp footer ul { list-style: none; }
+.lp footer li { margin-bottom: 8px; color: #a78fdf; }
+.lp footer .copyright { width: 100%; border-top: 2px solid #1a0a44; padding-top: 18px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; color: #a78fdf; font-size: 16px; }
+.lp footer .copyright .pix { font-family: 'Press Start 2P', monospace; font-size: 9px; color: #cdb6ff; }
+
+/* ---------- responsive ---------- */
+@media (max-width: 900px) {
+  .lp .logo-arcade { font-size: 44px; letter-spacing: 3px; }
+  .lp nav.top ul { display: none; }
+  .lp .features-grid { grid-template-columns: 1fr; }
+  .lp .chars-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp .tracks-grid { grid-template-columns: repeat(2, 1fr); }
+  .lp .crt-grid { grid-template-columns: 1fr; }
+  .lp .hero { height: 650px; }
+  .lp .hero .hero-cat { width: 180px; }
+}
+
+.lp .hero-road {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 300%;
+  height: 60%;
+  perspective: 300px;
+}
+
+.lp .hero-road::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 100%;
+  height: 300%;
+  transform: translateX(-50%) rotateX(70deg);
+  transform-origin: top center;
+
+  background-image:
+    linear-gradient(0deg, var(--pink) 0 2px, transparent 2px),
+    linear-gradient(90deg, var(--pink) 0 2px, transparent 2px);
+
+  background-size: 40px 40px;
+
+  animation:
+    lp-grid 0.9s linear infinite,
+    lp-hue 10s linear infinite;
+}
+
+@keyframes lp-hue {
+  from {
+    filter: hue-rotate(0deg);
+  }
+  to {
+    filter: hue-rotate(360deg);
+  }
+}

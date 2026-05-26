@@ -27,13 +27,10 @@ export function TouchControls() {
     setTouchFlag(flag, false);
   };
 
-  const baseBtn =
-    'pointer-events-auto select-none touch-none flex items-center justify-center font-pixel text-xl text-white/90 rounded-full border-2 active:scale-95 active:bg-white/20';
-
   return (
     <div className="pointer-events-none absolute inset-0 select-none">
-      {/* Bottom-left: steering pair. */}
-      <div className="absolute bottom-6 left-6 flex gap-3">
+      {/* Bottom-left: steering pair (HP + minimap stack above it). */}
+      <div className="absolute bottom-6 left-6 flex gap-4">
         <button
           type="button"
           aria-label="Steer left"
@@ -41,7 +38,7 @@ export function TouchControls() {
           onPointerUp={release(INPUT_FLAGS.LEFT)}
           onPointerCancel={release(INPUT_FLAGS.LEFT)}
           onPointerLeave={release(INPUT_FLAGS.LEFT)}
-          className={`${baseBtn} h-20 w-20 border-neon-cyan/60 bg-neon-cyan/15`}
+          className="touch-btn cyan h-20 w-20 text-2xl"
         >
           ◀
         </button>
@@ -52,14 +49,14 @@ export function TouchControls() {
           onPointerUp={release(INPUT_FLAGS.RIGHT)}
           onPointerCancel={release(INPUT_FLAGS.RIGHT)}
           onPointerLeave={release(INPUT_FLAGS.RIGHT)}
-          className={`${baseBtn} h-20 w-20 border-neon-cyan/60 bg-neon-cyan/15`}
+          className="touch-btn cyan h-20 w-20 text-2xl"
         >
           ▶
         </button>
       </div>
 
       {/* Bottom-right: throttle + brake + drift. */}
-      <div className="absolute bottom-6 right-6 flex items-end gap-3">
+      <div className="absolute bottom-7 right-7 flex items-end gap-4">
         <button
           type="button"
           aria-label="Drift"
@@ -67,11 +64,11 @@ export function TouchControls() {
           onPointerUp={release(INPUT_FLAGS.DRIFT)}
           onPointerCancel={release(INPUT_FLAGS.DRIFT)}
           onPointerLeave={release(INPUT_FLAGS.DRIFT)}
-          className={`${baseBtn} h-14 w-14 border-neon-violet/60 bg-neon-violet/15 text-sm`}
+          className="touch-btn violet h-14 w-14 text-[10px]"
         >
           DRFT
         </button>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <button
             type="button"
             aria-label="Throttle"
@@ -79,7 +76,7 @@ export function TouchControls() {
             onPointerUp={release(INPUT_FLAGS.THROTTLE)}
             onPointerCancel={release(INPUT_FLAGS.THROTTLE)}
             onPointerLeave={release(INPUT_FLAGS.THROTTLE)}
-            className={`${baseBtn} h-24 w-24 border-neon-orange/70 bg-neon-orange/25 text-lg`}
+            className="touch-btn orange h-24 w-24 text-base"
           >
             GAS
           </button>
@@ -90,7 +87,7 @@ export function TouchControls() {
             onPointerUp={release(INPUT_FLAGS.BRAKE)}
             onPointerCancel={release(INPUT_FLAGS.BRAKE)}
             onPointerLeave={release(INPUT_FLAGS.BRAKE)}
-            className={`${baseBtn} h-14 w-24 border-red-400/60 bg-red-500/20 text-sm`}
+            className="touch-btn red h-14 w-24 text-[10px]"
           >
             BRK
           </button>

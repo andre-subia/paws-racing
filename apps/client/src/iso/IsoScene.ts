@@ -218,7 +218,7 @@ function buildLabel(name: string, isLocal: boolean): Container {
   const style = new TextStyle({
     fontFamily: 'Press Start 2P, VT323, monospace',
     fontSize: 10,
-    fill: isLocal ? 0x42f5e0 : 0xffffff,
+    fill: isLocal ? 0x00e8ff : 0xffffff,
     stroke: { color: 0x000000, width: 3 },
   });
   const text = new Text({ text: name, style });

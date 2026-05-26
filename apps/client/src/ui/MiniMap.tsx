@@ -38,12 +38,12 @@ export function MiniMap({ trackId, players, localSid, compact = false }: MiniMap
     return { vbX: x0, vbY: z0, vbW: w, vbH: h, pathData: `${pts} Z` };
   }, [track]);
 
-  const w = compact ? 110 : 220;
-  const h = compact ? 70 : 150;
+  const w = compact ? 92 : 220;
+  const h = compact ? 52 : 150;
   return (
     <div
-      className={`pointer-events-none absolute rounded border-2 border-neon-cyan/60 bg-black/80 ${
-        compact ? 'bottom-28 left-2 p-1.5' : 'bottom-4 left-4 p-3'
+      className={`hud-box pointer-events-none absolute ${
+        compact ? 'bottom-44 left-6 p-1.5' : 'bottom-4 left-4 p-3'
       }`}
     >
       <div
@@ -62,19 +62,19 @@ export function MiniMap({ trackId, players, localSid, compact = false }: MiniMap
         <path
           d={pathData}
           fill="none"
-          stroke="#42f5e0"
+          stroke="#00e8ff"
           strokeWidth={4}
           opacity={0.75}
           strokeLinejoin="round"
         />
         {track.boostPads.map((pad, i) => (
-          <circle key={i} cx={pad.center.x} cy={pad.center.z} r={4} fill="#ff3aa3" />
+          <circle key={i} cx={pad.center.x} cy={pad.center.z} r={4} fill="#ff2dd1" />
         ))}
         <circle
           cx={track.checkpoints[0]!.center.x}
           cy={track.checkpoints[0]!.center.z}
           r={4}
-          fill="#ffb142"
+          fill="#ff7a1a"
         />
         {players
           .filter((p) => p.finishedAt === 0)
@@ -86,8 +86,8 @@ export function MiniMap({ trackId, players, localSid, compact = false }: MiniMap
                 cx={p.position.x}
                 cy={p.position.z}
                 r={isLocal ? 5.5 : 4}
-                fill={isLocal ? '#ffffff' : '#9b59ff'}
-                stroke={isLocal ? '#42f5e0' : 'none'}
+                fill={isLocal ? '#ffffff' : '#8a2cff'}
+                stroke={isLocal ? '#00e8ff' : 'none'}
                 strokeWidth={2}
               />
             );

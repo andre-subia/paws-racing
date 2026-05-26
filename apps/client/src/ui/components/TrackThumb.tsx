@@ -55,13 +55,13 @@ export function TrackThumb({
       <path
         d={pathData}
         fill="rgba(155, 89, 255, 0.12)"
-        stroke="#42f5e0"
+        stroke="#00e8ff"
         strokeWidth={4}
         opacity={0.9}
         strokeLinejoin="round"
       />
       {showAccent && start && (
-        <circle cx={start.x} cy={start.z} r={4.5} fill="#ffb142" />
+        <circle cx={start.x} cy={start.z} r={4.5} fill="#ff7a1a" />
       )}
     </svg>
   );

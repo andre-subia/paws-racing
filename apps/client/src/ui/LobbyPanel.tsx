@@ -73,8 +73,9 @@ export function LobbyPanel({
   const clampLaps = (n: number) => Math.min(LAPS_MAX, Math.max(LAPS_MIN, Math.round(n)));
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[560px] rounded-2xl border-2 border-neon-cyan/40 bg-black/70 p-6">
+    <div className="synth-bg absolute inset-0 flex items-center justify-center overflow-hidden">
+      <div className="mode7-bg" />
+      <div className="px-card relative z-10 w-[560px] max-w-[94vw] p-6">
         <div className="mb-4 flex items-baseline justify-between">
           <div>
             <div className="text-xs uppercase tracking-widest text-white/60">Room Code</div>
@@ -186,16 +187,12 @@ export function LobbyPanel({
           ))}
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-5">
           <button
             type="button"
             onClick={onToggleReady}
             disabled={isHost}
-            className={`rounded-md border-2 px-4 py-3 text-sm uppercase tracking-widest transition disabled:cursor-not-allowed disabled:opacity-30 ${
-              me?.ready
-                ? 'border-neon-cyan bg-neon-cyan/20 text-neon-cyan'
-                : 'border-white/30 bg-white/5 text-white/80 hover:border-white/60'
-            }`}
+            className={`px-btn ${me?.ready ? 'cyan' : 'ghost'}`}
           >
             {isHost ? 'Host' : me?.ready ? 'Ready ✓' : 'Ready?'}
           </button>
@@ -203,7 +200,7 @@ export function LobbyPanel({
             type="button"
             onClick={onStart}
             disabled={!isHost || !allReady}
-            className="rounded-md border-2 border-neon-magenta bg-neon-magenta/20 px-4 py-3 text-sm uppercase tracking-widest text-neon-magenta transition hover:bg-neon-magenta/30 disabled:cursor-not-allowed disabled:opacity-30"
+            className="px-btn"
           >
             Start Race
           </button>
