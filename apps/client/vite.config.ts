@@ -10,6 +10,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+    // Bind to 0.0.0.0 so the dev server is reachable from other devices on
+    // the LAN (phones, tablets) without needing the --host flag every time.
+    host: true,
     // Allow any ngrok subdomain so the dev server is reachable through a
     // shared tunnel without re-editing the config each session. The leading
     // dot tells Vite to treat it as a suffix match.

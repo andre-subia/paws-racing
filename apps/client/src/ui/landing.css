@@ -156,10 +156,26 @@
   }
 }
 
+/* ---------- first screen (nav + hero + marquee) ---------- */
+/* The trio fills exactly one viewport so the marquee lands at the bottom on
+ * load. svh keeps it stable on mobile (no jump as the address bar shows/hides);
+ * 100vh is the fallback for browsers without svh. The hero flexes to fill the
+ * space left between the nav and the marquee. */
+.lp .hero-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100svh;
+}
+.lp .hero-screen .strip {
+  flex: 0 0 auto;
+}
+
 /* ---------- hero ---------- */
 .lp .hero {
   position: relative;
-  height: 700px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   isolation: isolate;
 }
@@ -685,7 +701,6 @@
   .lp .chars-grid { grid-template-columns: repeat(2, 1fr); }
   .lp .tracks-grid { grid-template-columns: repeat(2, 1fr); }
   .lp .crt-grid { grid-template-columns: 1fr; }
-  .lp .hero { height: 650px; }
   .lp .hero .hero-cat { width: 180px; }
 }
 

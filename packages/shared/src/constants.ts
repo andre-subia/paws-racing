@@ -1,6 +1,9 @@
 export const SIM_HZ = 30;
 export const SIM_DT = 1 / SIM_HZ;
-export const BROADCAST_HZ = 20;
+// Match broadcast to the sim rate so clients receive every simulated frame
+// (no 50ms aliasing gap). With 8 racers this is ~50KB/s extra per client —
+// trivial on LAN and worth the buttery-smooth remote motion.
+export const BROADCAST_HZ = 30;
 export const BROADCAST_DT = 1 / BROADCAST_HZ;
 
 export const MAX_PLAYERS_PER_ROOM = 8;

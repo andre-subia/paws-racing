@@ -339,8 +339,13 @@ export class RaceRoom extends Room<RaceState> {
     this.state.finishOrder.clear();
     this.finishedAt = 0;
 
+    // Grid order = championship standings: leader takes pole, then down the
+    // points. First 4 fill the front row (slots 0-3), next 4 the back row.
+    const grid = [...this.state.players.entries()].sort(
+      ([, a], [, b]) => b.score - a.score,
+    );
     let slot = 0;
-    for (const [sid, player] of this.state.players) {
+    for (const [sid, player] of grid) {
       const spawn =
         this.track.spawnPoints[slot] ?? this.track.spawnPoints[this.track.spawnPoints.length - 1]!;
       const bike = this.bikeStates.get(sid) ?? emptyBikeState();

@@ -46,7 +46,14 @@ if (clientDist) {
 const httpServer = createServer(app);
 
 const gameServer = new Server({
-  transport: new WebSocketTransport({ server: httpServer }),
+  // Be lenient with heartbeats: mobile/Wi-Fi lag spikes shouldn't drop a live
+  // race. ~5 missed pings at 6s ≈ 30s of grace before the socket is closed
+  // (well within the 20s allowReconnection window the room also grants).
+  transport: new WebSocketTransport({
+    server: httpServer,
+    pingInterval: 6000,
+    pingMaxRetries: 5,
+  }),
 });
 
 gameServer.define(ROOM_NAMES.RACE, RaceRoom).filterBy(['code']);

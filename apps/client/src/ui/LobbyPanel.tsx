@@ -74,9 +74,12 @@ export function LobbyPanel({
   const clampBots = (n: number) => Math.min(maxBots, Math.max(0, Math.round(n)));
 
   return (
-    <div className="synth-bg absolute inset-0 flex items-center justify-center overflow-hidden">
+    <div className="synth-bg absolute inset-0 flex justify-center overflow-y-auto overflow-x-hidden py-6">
       <div className="mode7-bg" />
-      <div className="px-card relative z-10 w-[560px] max-w-[94vw] p-6">
+      {/* my-auto centers the card when it fits and lets it scroll when the
+       * roster + options grow taller than the viewport (8 players + bots),
+       * so the map picker and Start button stay reachable. */}
+      <div className="px-card relative z-10 my-auto w-[560px] max-w-[94vw] p-6">
         <div className="mb-4 flex items-baseline justify-between">
           <div>
             <div className="text-xs uppercase tracking-widest text-white/60">Room Code</div>
@@ -91,35 +94,39 @@ export function LobbyPanel({
           </button>
         </div>
 
-        <div className="mb-4 rounded border border-white/10 bg-black/40">
+        {/* Standings, sorted by score. Two compact columns (places 1–4 down the
+         * left, 5–8 down the right) so 8 players never push the buttons off. */}
+        <div className="mb-4 grid auto-cols-fr grid-flow-col grid-rows-4 gap-1.5">
           {[...players]
             .sort((a, b) => b.score - a.score)
-            .map((p) => (
+            .map((p, i) => (
               <div
                 key={p.id}
-                className="flex items-center justify-between border-b border-white/5 px-4 py-2 last:border-b-0"
+                className={`flex items-center justify-between gap-2 rounded border px-2 py-1.5 ${
+                  p.id === localSid
+                    ? 'border-neon-cyan/60 bg-neon-cyan/10'
+                    : 'border-white/10 bg-black/30'
+                }`}
               >
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="w-4 shrink-0 text-right font-pixel text-[10px] tabular-nums text-white/40">
+                    {i + 1}
+                  </span>
                   <span
-                    className={`inline-block h-2 w-2 rounded-full ${
+                    className={`inline-block h-2 w-2 shrink-0 rounded-full ${
                       p.ready || p.host ? 'bg-neon-cyan' : 'bg-white/30'
                     }`}
                   />
-                  <span className="text-lg">{p.name}</span>
+                  <span className="truncate text-sm">{p.name}</span>
                   {p.host && (
-                    <span className="rounded bg-neon-magenta/20 px-2 py-0.5 text-xs uppercase tracking-widest text-neon-magenta">
-                      Host
+                    <span className="shrink-0 rounded bg-neon-magenta/20 px-1 text-[9px] uppercase tracking-widest text-neon-magenta">
+                      H
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-white/60">
-                    {VEHICLES[p.vehicle as VehicleId]?.label ?? p.vehicle}
-                  </span>
-                  <span className="font-pixel text-xs tabular-nums text-neon-yellow">
-                    ★ {p.score}
-                  </span>
-                </div>
+                <span className="shrink-0 font-pixel text-xs tabular-nums text-neon-yellow">
+                  ★{p.score}
+                </span>
               </div>
             ))}
         </div>

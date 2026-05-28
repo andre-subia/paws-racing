@@ -1,4 +1,4 @@
-import { INPUT_FLAGS, SIM_HZ } from '@paws/shared';
+import { INPUT_FLAGS, type RaceState, SIM_HZ } from '@paws/shared';
 import type { Room } from 'colyseus.js';
 import type { PredictionController } from './prediction.ts';
 
@@ -37,7 +37,10 @@ export interface InputController {
  * Samples keyboard at SIM_HZ, drives client-side prediction locally, and
  * sends the same inputs to the room with monotonic seq numbers.
  */
-export function startInputLoop(room: Room, prediction: PredictionController): InputController {
+export function startInputLoop(
+  room: Room<RaceState>,
+  prediction: PredictionController,
+): InputController {
   const pressed = new Set<string>();
   let seq = 0;
   let tick = 0;
@@ -55,6 +58,11 @@ export function startInputLoop(room: Room, prediction: PredictionController): In
   window.addEventListener('keyup', onUp);
 
   const interval = window.setInterval(() => {
+    // Only drive prediction + send during the actual race. Pre-race inputs
+    // (e.g. holding GAS during the countdown) would predict the bike forward
+    // while the server keeps it frozen at spawn, snap-flickering on each
+    // broadcast. Pause until the lights go green.
+    if (room.state?.phase !== 'racing') return;
     let flags = 0;
     for (const code of pressed) flags |= KEY_MAP[code] ?? 0;
     for (const f of touchFlags) flags |= f;

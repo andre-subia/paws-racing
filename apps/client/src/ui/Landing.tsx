@@ -36,82 +36,193 @@ export function Landing() {
     <div className="lp">
       <div className="crt-overlay" />
 
-      {/* NAV */}
-      <nav className="top">
-        <div className="row">
-          <div className="brand">
-            <div className="mark" />
-            <span>
-              PAWS<span style={{ color: 'var(--yellow)' }}>/</span>RACING
-            </span>
-          </div>
-          <ul>
-            <li>
-              <a href="#features" onClick={scrollTo('features')}>
-                FEATURES
-              </a>
-            </li>
-            <li>
-              <a href="#riders" onClick={scrollTo('riders')}>
-                RIDERS
-              </a>
-            </li>
-            <li>
-              <a href="#play" onClick={scrollTo('play')}>
-                GAMEPLAY
-              </a>
-            </li>
-            <li>
-              <a href="#tracks" onClick={scrollTo('tracks')}>
-                TRACKS
-              </a>
-            </li>
-          </ul>
-          <button type="button" className="pbtn cyan" onClick={play}>
-            ▶ PLAY
-          </button>
-        </div>
-      </nav>
-
-      {/* HERO */}
-      <header className="hero">
-        <div className="sky" />
-        <div className="sun" />
-        <div className="hero-road"/>
-        <div className="content">
-          <div className="logo-arcade">
-            PAWS <span className="a2">RACING</span>
-          </div>
-          <div className="tagline">
-            16-BIT BIKER CATS <span className="sep">·</span> MODE-7 SPEED{' '}
-            <span className="sep">·</span> ONLINE 8-PACK
-          </div>
-          <div className="cta-row">
-            <button type="button" className="pbtn cyan" onClick={scrollTo('riders')}>
-              ★ MEET THE CATS
+      {/* First screen — nav + hero + marquee fill the viewport so the marquee
+       * sits at the bottom of the available space on load (web + mobile). */}
+      <div className="hero-screen">
+        {/* NAV */}
+        <nav className="top">
+          <div className="row">
+            <div className="brand">
+              <div className="mark" />
+              <span>
+                PAWS<span style={{ color: 'var(--yellow)' }}>/</span>RACING
+              </span>
+            </div>
+            <ul>
+              <li>
+                <a href="#features" onClick={scrollTo('features')}>
+                  FEATURES
+                </a>
+              </li>
+              <li>
+                <a href="#riders" onClick={scrollTo('riders')}>
+                  RIDERS
+                </a>
+              </li>
+              <li>
+                <a href="#play" onClick={scrollTo('play')}>
+                  GAMEPLAY
+                </a>
+              </li>
+              <li>
+                <a href="#tracks" onClick={scrollTo('tracks')}>
+                  TRACKS
+                </a>
+              </li>
+            </ul>
+            <button type="button" className="pbtn cyan" onClick={play}>
+              ▶ PLAY
             </button>
           </div>
-          <div className="insert-coin">▌ INSERT COIN TO START ▐</div>
-        </div>
+        </nav>
 
+        {/* HERO */}
+        <header className="hero">
+          <div className="sky" />
+          <div className="sun" />
+          <svg
+      className="mountains"
+      viewBox="0 0 1600 140"
+      preserveAspectRatio="none"
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        top: '46%',
+        width: '100%',
+        height: '140px',
+        zIndex: 2,
+      }}
+    >
+      {/* far back */}
+      <g fill="#3a1d7a">
+        <rect x="0" y="80" width="1600" height="60" />
+        <polygon points="40,80 100,40 160,80" />
+        <polygon points="180,80 260,30 340,80" />
+        <polygon points="360,80 440,50 520,80" />
+        <polygon points="540,80 640,25 740,80" />
+        <polygon points="760,80 840,45 920,80" />
+        <polygon points="940,80 1040,35 1140,80" />
+        <polygon points="1160,80 1240,55 1320,80" />
+        <polygon points="1340,80 1440,30 1540,80" />
+      </g>
 
-        <img className="hero-cat" src="/assets/cats/cat1.png" alt="Biker cat" />
+      {/* nearer range */}
+      <g fill="#1a0a44">
+        <rect x="0" y="100" width="1600" height="40" />
+        <polygon points="0,100 80,60 160,100" />
+        <polygon points="140,100 240,40 340,100" />
+        <polygon points="320,100 420,70 520,100" />
+        <polygon points="500,100 620,30 740,100" />
+        <polygon points="720,100 820,60 920,100" />
+        <polygon points="900,100 1020,40 1140,100" />
+        <polygon points="1120,100 1240,55 1360,100" />
+        <polygon points="1340,100 1460,45 1600,100" />
+      </g>
 
-      </header>
+      {/* city silhouette */}
+      <g fill="#000">
+        <rect x="40" y="100" width="20" height="40" />
+        <rect x="70" y="92" width="16" height="48" />
+        <rect x="92" y="106" width="22" height="34" />
 
-      {/* MARQUEE */}
-      <div className="strip">
-        <div className="marquee">
-          <em>NEW</em>
-          <span>·</span> {VEHICLE_LIST.length} RIDERS <span>·</span> {TRACK_LIST.length} CIRCUITS{' '}
-          <span>·</span> ONLINE {MAX_PLAYERS_PER_ROOM}-PLAYER <span>·</span> MODE-7 DRIFT{' '}
-          <span>·</span> REAR-HIT COMBAT <span>·</span> CODE-JOIN LOBBIES <span>·</span>{' '}
-          <em>FREE TO PLAY</em> <span>·</span> {VEHICLE_LIST.length} RIDERS <span>·</span>{' '}
-          {TRACK_LIST.length} CIRCUITS <span>·</span> ONLINE {MAX_PLAYERS_PER_ROOM}-PLAYER{' '}
-          <span>·</span> MODE-7 DRIFT <span>·</span> REAR-HIT COMBAT <span>·</span>{' '}
-          CODE-JOIN LOBBIES <span>·</span> <em>FREE TO PLAY</em> <span>·</span>
+        <rect x="200" y="98" width="18" height="42" />
+        <rect x="222" y="86" width="24" height="54" />
+        <rect x="250" y="100" width="14" height="40" />
+
+        <rect x="380" y="95" width="22" height="45" />
+        <rect x="408" y="105" width="14" height="35" />
+
+        <rect x="560" y="88" width="20" height="52" />
+        <rect x="586" y="98" width="28" height="42" />
+
+        <rect x="700" y="100" width="16" height="40" />
+
+        <rect x="900" y="92" width="22" height="48" />
+        <rect x="928" y="100" width="16" height="40" />
+
+        <rect x="1080" y="95" width="20" height="45" />
+        <rect x="1106" y="105" width="14" height="35" />
+
+        <rect x="1230" y="100" width="22" height="40" />
+
+        <rect x="1380" y="92" width="18" height="48" />
+        <rect x="1404" y="100" width="22" height="40" />
+
+        {/* antennae */}
+        <rect x="77" y="84" width="2" height="8" />
+        <rect x="230" y="78" width="2" height="8" />
+        <rect x="570" y="80" width="2" height="8" />
+        <rect x="908" y="84" width="2" height="8" />
+      </g>
+
+      {/* neon yellow */}
+      <g fill="#ffd400">
+        <rect x="46" y="110" width="2" height="2" />
+        <rect x="52" y="115" width="2" height="2" />
+        <rect x="226" y="100" width="2" height="2" />
+        <rect x="232" y="108" width="2" height="2" />
+        <rect x="566" y="98" width="2" height="2" />
+        <rect x="572" y="110" width="2" height="2" />
+        <rect x="912" y="104" width="2" height="2" />
+        <rect x="1234" y="112" width="2" height="2" />
+        <rect x="1386" y="100" width="2" height="2" />
+      </g>
+
+      {/* neon pink */}
+      <g fill="#ff2dd1">
+        <rect x="74" y="100" width="2" height="2" />
+        <rect x="240" y="92" width="2" height="2" />
+        <rect x="595" y="106" width="2" height="2" />
+        <rect x="920" y="100" width="2" height="2" />
+        <rect x="1090" y="106" width="2" height="2" />
+        <rect x="1410" y="106" width="2" height="2" />
+      </g>
+
+      {/* neon cyan */}
+      <g fill="#00e8ff">
+        <rect x="100" y="114" width="2" height="2" />
+        <rect x="208" y="114" width="2" height="2" />
+        <rect x="406" y="116" width="2" height="2" />
+        <rect x="710" y="110" width="2" height="2" />
+        <rect x="932" y="116" width="2" height="2" />
+      </g>
+    </svg>
+          <div className="hero-road" />
+          <div className="content">
+            <div className="logo-arcade">
+              PAWS <span className="a2">RACING</span>
+            </div>
+            <div className="tagline">
+              16-BIT BIKER CATS <span className="sep">·</span> MODE-7 SPEED{' '}
+              <span className="sep">·</span> ONLINE 8-PACK
+            </div>
+            <div className="cta-row">
+              <button type="button" className="pbtn cyan" onClick={scrollTo('riders')}>
+                ★ MEET THE CATS
+              </button>
+            </div>
+            <div className="insert-coin">▌ INSERT COIN TO START ▐</div>
+          </div>
+
+          <img className="hero-cat" src="/assets/cats/cat1.png" alt="Biker cat" />
+        </header>
+
+        {/* MARQUEE */}
+        <div className="strip">
+          <div className="marquee">
+            <em>NEW</em>
+            <span>·</span> {VEHICLE_LIST.length} RIDERS <span>·</span> {TRACK_LIST.length} CIRCUITS{' '}
+            <span>·</span> ONLINE {MAX_PLAYERS_PER_ROOM}-PLAYER <span>·</span> MODE-7 DRIFT{' '}
+            <span>·</span> REAR-HIT COMBAT <span>·</span> CODE-JOIN LOBBIES <span>·</span>{' '}
+            <em>FREE TO PLAY</em> <span>·</span> {VEHICLE_LIST.length} RIDERS <span>·</span>{' '}
+            {TRACK_LIST.length} CIRCUITS <span>·</span> ONLINE {MAX_PLAYERS_PER_ROOM}-PLAYER{' '}
+            <span>·</span> MODE-7 DRIFT <span>·</span> REAR-HIT COMBAT <span>·</span> CODE-JOIN
+            LOBBIES <span>·</span> <em>FREE TO PLAY</em> <span>·</span>
+          </div>
         </div>
       </div>
+      {/* /hero-screen */}
 
       {/* FEATURES */}
       <section className="block" id="features">
@@ -120,12 +231,30 @@ export function Landing() {
           BUILT FOR <span className="accent">PURE ARCADE SPEED</span>
         </h2>
         <div className="features-grid">
-          <Feat title="MODE-7 DRIFT" body="On-rails arcade handling — snap turns, no realism, all rubber. Hold drift for slide-corner moves." />
-          <Feat title="REAR-HIT COMBAT" body="Ram a rival's tail to drain their health. Hit zero and they explode — then respawn at the last checkpoint." />
-          <Feat title={`ONLINE ${MAX_PLAYERS_PER_ROOM}-PACK`} body="Quick Race into a public lobby, or Create Private and share a 5-letter code with friends." />
-          <Feat title={`${VEHICLE_LIST.length} BIKER CATS`} body="Each rider tunes accel, top speed, turn rate and drift grip. Pick the cat that fits your line." />
-          <Feat title={`${TRACK_LIST.length} CIRCUITS`} body="From the Neo-Kibble stadium to twisty alley sprawls. Host picks the track and lap count." />
-          <Feat title="PIXEL + MOBILE" body="Crisp pixel-art rendering with on-screen touch controls — race from desktop or phone, same link." />
+          <Feat
+            title="MODE-7 DRIFT"
+            body="On-rails arcade handling — snap turns, no realism, all rubber. Hold drift for slide-corner moves."
+          />
+          <Feat
+            title="REAR-HIT COMBAT"
+            body="Ram a rival's tail to drain their health. Hit zero and they explode — then respawn at the last checkpoint."
+          />
+          <Feat
+            title={`ONLINE ${MAX_PLAYERS_PER_ROOM}-PACK`}
+            body="Quick Race into a public lobby, or Create Private and share a 5-letter code with friends."
+          />
+          <Feat
+            title={`${VEHICLE_LIST.length} BIKER CATS`}
+            body="Each rider tunes accel, top speed, turn rate and drift grip. Pick the cat that fits your line."
+          />
+          <Feat
+            title={`${TRACK_LIST.length} CIRCUITS`}
+            body="From the Neo-Kibble stadium to twisty alley sprawls. Host picks the track and lap count."
+          />
+          <Feat
+            title="PIXEL + MOBILE"
+            body="Crisp pixel-art rendering with on-screen touch controls — race from desktop or phone, same link."
+          />
         </div>
       </section>
 
@@ -313,7 +442,16 @@ export function Landing() {
                 fontSize: 14,
               }}
             >
-              <div className="mark" style={{ width: 24, height: 24, background: 'conic-gradient(from 0deg at 50% 50%, var(--pink), var(--cyan), var(--yellow), var(--pink))', boxShadow: '0 0 0 4px #000, 0 0 0 8px #fff' }} />
+              <div
+                className="mark"
+                style={{
+                  width: 24,
+                  height: 24,
+                  background:
+                    'conic-gradient(from 0deg at 50% 50%, var(--pink), var(--cyan), var(--yellow), var(--pink))',
+                  boxShadow: '0 0 0 4px #000, 0 0 0 8px #fff',
+                }}
+              />
               <span>
                 PAWS<span style={{ color: 'var(--yellow)' }}>/</span>RACING
               </span>
@@ -346,17 +484,35 @@ export function Landing() {
             <h4>PLAY</h4>
             <ul>
               <li>
-                <a href="#" onClick={(e) => { e.preventDefault(); play(); }}>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    play();
+                  }}
+                >
                   Quick Race
                 </a>
               </li>
               <li>
-                <a href="#" onClick={(e) => { e.preventDefault(); play(); }}>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    play();
+                  }}
+                >
                   Create Private
                 </a>
               </li>
               <li>
-                <a href="#" onClick={(e) => { e.preventDefault(); play(); }}>
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    play();
+                  }}
+                >
                   Join by Code
                 </a>
               </li>
