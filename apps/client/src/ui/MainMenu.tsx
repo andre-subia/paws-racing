@@ -35,9 +35,11 @@ export function MainMenu() {
   const clampBots = (n: number) => Math.min(MAX_BOTS, Math.max(0, Math.round(n)));
 
   return (
-    <div className="synth-bg absolute inset-0 flex items-center justify-center overflow-hidden">
+    <div className="synth-bg absolute inset-0 flex justify-center overflow-y-auto overflow-x-hidden py-6">
       <div className="mode7-bg" />
-      <div className="px-card relative z-10 w-[460px] max-w-[92vw] p-7">
+      {/* my-auto centers the card when it fits and lets it scroll when the
+       * options run taller than the viewport (short screens / create mode). */}
+      <div className="px-card relative z-10 my-auto w-[460px] max-w-[92vw] p-7">
         <h1 className="mb-1 font-pixel text-2xl tracking-tight text-neon-magenta drop-shadow-[2px_2px_0_#000]">
           PAWS<span className="text-neon-yellow">/</span>RACING
         </h1>

@@ -3,6 +3,8 @@ import { TILE_H, TILE_W, worldToScreen } from './projection.js';
 import type { SpriteAtlas } from './sprites.js';
 
 const BODY_SCALE = 1.0;
+/** Screen pixels per world unit of jump height. */
+const HEIGHT_PX = 16;
 
 /**
  * Visual representation of a single bike. The cat is a side-view sprite, so
@@ -53,11 +55,20 @@ export class BikeView {
     this.body.texture = tex;
   }
 
-  update(x: number, z: number, yaw: number) {
+  update(x: number, z: number, yaw: number, height = 0) {
     const sc = worldToScreen(x, z);
     this.container.x = Math.round(sc.x);
     this.container.y = Math.round(sc.y - TILE_H * 0.25);
     this.container.zIndex = x + z;
+
+    // Lift the body + name tag by the jump height while the shadow stays
+    // pinned to the ground (and shrinks/fades) — the classic arcade-air look.
+    const liftPx = Math.max(0, height) * HEIGHT_PX;
+    this.body.y = -liftPx;
+    this.label.y = -liftPx;
+    const shrink = Math.max(0.5, 1 - height * 0.06);
+    this.shadow.scale.set(BODY_SCALE * 1.4 * shrink);
+    this.shadow.alpha = Math.max(0.35, 1 - height * 0.05);
 
     // Project world forward into screen space.
     const fx = -Math.sin(yaw);

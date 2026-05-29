@@ -26,8 +26,8 @@ function rankColor(rank: number): string {
 
 export function Results({ rows, raceStartedAt, onLeave }: ResultsProps) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-[760px] max-w-[94vw] rounded-2xl border-2 border-neon-cyan/40 bg-black/80 p-6">
+    <div className="absolute inset-0 flex justify-center overflow-y-auto bg-black/60 py-6 backdrop-blur-sm">
+      <div className="my-auto w-[760px] max-w-[94vw] rounded-2xl border-2 border-neon-cyan/40 bg-black/80 p-6">
         <h2 className="mb-4 font-pixel text-2xl text-neon-cyan">RESULTS</h2>
 
         {/* Two columns of four: places 1–4 fill the left column top-to-bottom,

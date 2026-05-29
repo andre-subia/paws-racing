@@ -21,6 +21,8 @@ function driveBot(track, vehicle, skill, seconds) {
     vz: 0,
     speed: 0,
     drifting: false,
+    vy: 0,
+    jumpHeld: false,
     wallImpact: 0,
   };
   const player = { id: 'bot-1', lap: 0, checkpoint: -1, finishedAt: 0, position_rank: 0 };

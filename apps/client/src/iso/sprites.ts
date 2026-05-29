@@ -109,16 +109,23 @@ function buildTile(
 }
 
 function buildCheckpoint(renderer: Renderer, color: string): Texture {
-  const W = 6;
-  const H = 32;
+  // Tall, bright post so the next gate reads clearly from across the track.
+  const W = 12;
+  const H = 64;
   const g = new Graphics();
   const c = new Color(color);
+  // Glow halo behind the post.
+  g.rect(-3, 0, W + 6, H).fill({ color: c.toNumber(), alpha: 0.3 });
   g.rect(0, 0, W, H).fill({ color: c.toNumber() });
-  g.rect(0, 0, W, 4).fill({ color: '#ffffff' });
-  g.rect(0, H - 4, W, 4).fill({ color: c.multiply(new Color('#666666')).toNumber() });
-  const rt = RenderTexture.create({ width: W, height: H, resolution: 1, antialias: false });
+  // Bright vertical core + white cap + darker base for depth.
+  g.rect(W / 2 - 2, 0, 4, H).fill({ color: '#ffffff', alpha: 0.55 });
+  g.rect(0, 0, W, 6).fill({ color: '#ffffff' });
+  g.rect(0, H - 6, W, 6).fill({ color: c.multiply(new Color('#777777')).toNumber() });
+  const rt = RenderTexture.create({ width: W + 6, height: H, resolution: 1, antialias: false });
   rt.source.scaleMode = 'nearest';
-  renderer.render({ container: g, target: rt, clear: true });
+  const matrix = new Matrix();
+  matrix.tx = 3;
+  renderer.render({ container: g, target: rt, clear: true, transform: matrix });
   g.destroy();
   return rt;
 }

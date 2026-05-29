@@ -1,6 +1,13 @@
 import { INPUT_FLAGS, type InputFlags, hasFlag } from './input.js';
 import { type VehicleSpec } from './constants.js';
-import { type TrackDef, type Vec3Lit } from './track.js';
+import { type RampDef, type TrackDef, type Vec3Lit } from './track.js';
+
+/** Resting height of a bike above the track surface (matches the spawn offset). */
+export const BIKE_GROUND_OFFSET = 0.5;
+/** Upward launch speed (m/s) for a manual hop — a drift tap, Mario-Kart style. */
+export const JUMP_VELOCITY = 11;
+/** Gravity pulling airborne bikes back to the ground (m/s²). */
+export const GRAVITY = 34;
 
 /**
  * Minimal bike kinematic state. Identical structure used on both client (for
@@ -16,6 +23,10 @@ export interface BikeState {
   vz: number;
   speed: number;
   drifting: boolean;
+  /** Vertical velocity (m/s). Positive = rising. Drives hops/ramp launches. */
+  vy: number;
+  /** Whether the drift/jump input was held last tick (for rising-edge hops). */
+  jumpHeld: boolean;
   /** Outward speed (m/s) at which the bike hit the track wall this tick. 0
    * otherwise. Transient — reset at the start of each stepBike call. */
   wallImpact: number;
@@ -24,13 +35,15 @@ export interface BikeState {
 export function emptyBikeState(): BikeState {
   return {
     x: 0,
-    y: 0.5,
+    y: BIKE_GROUND_OFFSET,
     z: 0,
     yaw: 0,
     vx: 0,
     vz: 0,
     speed: 0,
     drifting: false,
+    vy: 0,
+    jumpHeld: false,
     wallImpact: 0,
   };
 }
@@ -79,7 +92,67 @@ export function stepBike(
 
   if (track) clampToTrack(state, track);
 
+  // --- Vertical (jump) physics ---------------------------------------------
+  // Ground sits at surfaceY + offset. A drift TAP while grounded hops the bike
+  // (hold-to-drift still works — the hop only fires on the press edge). Ramps
+  // launch harder. Everything here is deterministic so client prediction and
+  // the server stay in lockstep; horizontal clamping above keeps you on track,
+  // so a jump is pure air (you never fall off).
+  const groundY = (track ? track.surfaceY : 0) + BIKE_GROUND_OFFSET;
+  const grounded = state.y <= groundY + 0.001 && state.vy <= 0.001;
+  if (grounded) {
+    if (drifting && !state.jumpHeld) state.vy = JUMP_VELOCITY;
+    if (track) {
+      for (const ramp of track.ramps) {
+        if (isInsideRamp(state, ramp)) {
+          state.vy = ramp.launch;
+          break;
+        }
+      }
+    }
+  }
+  state.jumpHeld = drifting;
+  state.vy -= GRAVITY * dt;
+  state.y += state.vy * dt;
+  if (state.y <= groundY) {
+    state.y = groundY;
+    state.vy = 0;
+  }
+
   state.drifting = drifting && Math.abs(steer) > 0.1 && state.speed > 8;
+}
+
+/** True when (x, z) lies within an oriented rectangle (travel-yaw convention). */
+export function insideBox(
+  x: number,
+  z: number,
+  box: { center: Vec3Lit; yaw: number; width: number; length: number },
+): boolean {
+  const dx = x - box.center.x;
+  const dz = z - box.center.z;
+  const fwdX = -Math.sin(box.yaw);
+  const fwdZ = -Math.cos(box.yaw);
+  const sideX = -Math.cos(box.yaw);
+  const sideZ = Math.sin(box.yaw);
+  const along = dx * fwdX + dz * fwdZ;
+  const across = dx * sideX + dz * sideZ;
+  return Math.abs(along) <= box.length / 2 && Math.abs(across) <= box.width / 2;
+}
+
+/** True when the bike sits within the rectangular footprint of a launch ramp. */
+function isInsideRamp(state: BikeState, ramp: RampDef): boolean {
+  return insideBox(state.x, state.z, ramp);
+}
+
+/**
+ * True when the bike is over a hole in the track. Used by the server for fatal
+ * fall detection — a bike that touches down inside a gap is wrecked.
+ */
+export function isOverGap(state: BikeState, track: TrackDef): boolean {
+  for (const gap of track.gaps) {
+    if (insideBox(state.x, state.z, gap)) return true;
+  }
+  return false;
 }
 
 /**

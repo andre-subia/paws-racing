@@ -2,6 +2,7 @@ import { MAX_PLAYERS_PER_ROOM } from '../constants.js';
 import type {
   BoostPadDef,
   CheckpointDef,
+  RampDef,
   SpawnPoint,
   TrackDef,
   Vec3Lit,
@@ -150,6 +151,26 @@ function buildBoostPads(): BoostPadDef[] {
   ];
 }
 
+function buildRamps(): RampDef[] {
+  // A launch ramp midway down each long straight — catch big air on the flats.
+  return [
+    {
+      center: { x: 0, y: SURFACE_Y, z: STRAIGHT / 3 },
+      yaw: Math.PI, // travelling -z
+      width: 8,
+      length: 6,
+      launch: 14,
+    },
+    {
+      center: { x: 2 * RADIUS, y: SURFACE_Y, z: -STRAIGHT / 3 },
+      yaw: 0, // travelling +z
+      width: 8,
+      length: 6,
+      launch: 14,
+    },
+  ];
+}
+
 export const neoKibbleCity: TrackDef = {
   id: 'neo_kibble_city',
   name: 'Neo-Kibble City',
@@ -159,4 +180,6 @@ export const neoKibbleCity: TrackDef = {
   spawnPoints: spawnPoints(),
   checkpoints: buildCheckpoints(),
   boostPads: buildBoostPads(),
+  ramps: buildRamps(),
+  gaps: [],
 };

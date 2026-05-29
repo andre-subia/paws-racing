@@ -79,5 +79,8 @@ export const TRACK_IDS = [
   'catnip_speedway',
   'alleycat_sprawl',
   'litter_box_loop',
+  'whisker_heights',
+  'catnip_canyon',
+  'tomcat_skyway',
 ] as const;
 export type TrackId = (typeof TRACK_IDS)[number];

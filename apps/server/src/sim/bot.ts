@@ -7,13 +7,13 @@ import {
 } from '@paws/shared';
 
 /**
- * How many centerline samples ahead the bot aims for. The loop is sampled
- * densely on corners and sparsely on straights, so a fixed offset naturally
- * yields a shorter look-ahead (tighter line) through corners and a longer one
- * on straights. 5 tracks the centerline faithfully (no wall grinding) while
- * still reading the corner early; larger values cut chords into the inside wall.
+ * How far ahead (world metres) along the centerline the bot aims. Distance-
+ * based (not a fixed sample count) so it behaves the same regardless of how
+ * densely a track samples its loop — wide sweeping corners and tight ones both
+ * get the same ~lookahead, so the bot follows the line without cutting into the
+ * inside wall.
  */
-const LOOKAHEAD_SAMPLES = 5;
+const LOOKAHEAD_DIST = 11;
 
 /** Find the index of the centerline sample nearest the bike (cheap O(n)). */
 function nearestLoopIndex(loop: TrackDef['loop'], x: number, z: number): number {
@@ -30,6 +30,21 @@ function nearestLoopIndex(loop: TrackDef['loop'], x: number, z: number): number 
     }
   }
   return best;
+}
+
+/** Walk forward along the loop ~`dist` metres from `idx`, return the aim point. */
+function lookAheadPoint(loop: TrackDef['loop'], idx: number, dist: number) {
+  const n = loop.length;
+  let acc = 0;
+  let j = idx;
+  for (let steps = 0; steps < n; steps++) {
+    const a = loop[j % n]!;
+    const b = loop[(j + 1) % n]!;
+    acc += Math.hypot(b.x - a.x, b.z - a.z);
+    j++;
+    if (acc >= dist) break;
+  }
+  return loop[j % n]!;
 }
 
 /**
@@ -49,9 +64,8 @@ export function computeBotInput(
   skill: number,
 ): InputFlags {
   const loop = track.loop;
-  const n = loop.length;
   const idx = nearestLoopIndex(loop, bike.x, bike.z);
-  const aim = loop[(idx + LOOKAHEAD_SAMPLES) % n]!;
+  const aim = lookAheadPoint(loop, idx, LOOKAHEAD_DIST);
 
   let tx = aim.x - bike.x;
   let tz = aim.z - bike.z;
@@ -82,7 +96,11 @@ export function computeBotInput(
   // brake — only when a genuinely hard corner would fling us into the wall.
   // Otherwise drive up to the skill-capped top speed.
   const maxSpeed = spec.topSpeed * (0.82 + 0.18 * skill);
-  const hardCorner = absErr > 1.0 && bike.speed > spec.topSpeed * 0.6;
+  // Brake early when the heading error is big and we're carrying speed —
+  // scaled by how nimble the bike is, so low-turn-rate heavies (Bruiser) slow
+  // enough to make wide corners instead of plowing into the outside wall.
+  const cornerThreshold = 0.5 + spec.turnRate * 0.12;
+  const hardCorner = absErr > cornerThreshold && bike.speed > spec.topSpeed * 0.45;
   if (hardCorner) {
     flags |= INPUT_FLAGS.BRAKE;
   } else if (bike.speed < maxSpeed) {

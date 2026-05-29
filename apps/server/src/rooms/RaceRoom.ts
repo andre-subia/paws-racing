@@ -1,11 +1,13 @@
 import { Client, Room } from '@colyseus/core';
 import {
   type BikeState,
+  BIKE_GROUND_OFFSET,
   BROADCAST_DT,
   COUNTDOWN_MS,
   emptyBikeState,
   getTrack,
   type InputCommand,
+  isOverGap,
   LAPS_DEFAULT,
   LAPS_MAX,
   LAPS_MIN,
@@ -341,9 +343,7 @@ export class RaceRoom extends Room<RaceState> {
 
     // Grid order = championship standings: leader takes pole, then down the
     // points. First 4 fill the front row (slots 0-3), next 4 the back row.
-    const grid = [...this.state.players.entries()].sort(
-      ([, a], [, b]) => b.score - a.score,
-    );
+    const grid = [...this.state.players.entries()].sort(([, a], [, b]) => b.score - a.score);
     let slot = 0;
     for (const [sid, player] of grid) {
       const spawn =
@@ -355,6 +355,8 @@ export class RaceRoom extends Room<RaceState> {
       bike.yaw = spawn.yaw;
       bike.vx = 0;
       bike.vz = 0;
+      bike.vy = 0;
+      bike.jumpHeld = false;
       bike.speed = 0;
       bike.drifting = false;
       this.bikeStates.set(sid, bike);
@@ -424,6 +426,8 @@ export class RaceRoom extends Room<RaceState> {
     bike.yaw = cp.yaw;
     bike.vx = 0;
     bike.vz = 0;
+    bike.vy = 0;
+    bike.jumpHeld = false;
     bike.speed = 0;
     bike.wallImpact = 0;
     this.gateMem.set(sid, { lastSignedDist: -1 });
@@ -532,6 +536,19 @@ export class RaceRoom extends Room<RaceState> {
           if (player.health <= 0) this.killPlayer(sid, player, now);
         }
       }
+
+      // Fall into a gap: touching down over a hole is fatal. Jump it (ramp or
+      // a drift hop) to stay airborne and clear the void.
+      const groundY = this.track.surfaceY + BIKE_GROUND_OFFSET;
+      if (
+        acceptInputs &&
+        player.explodedAt === 0 &&
+        player.finishedAt === 0 &&
+        bike.y <= groundY + 0.05 &&
+        isOverGap(bike, this.track)
+      ) {
+        this.killPlayer(sid, player, now);
+      }
     }
 
     // Process pending respawns. Player stays exploded for ~1.5s, then we
@@ -620,7 +637,7 @@ function syncToSchema(bike: BikeState, player: PlayerState) {
   player.position.y = bike.y;
   player.position.z = bike.z;
   player.velocity.x = bike.vx;
-  player.velocity.y = 0;
+  player.velocity.y = bike.vy;
   player.velocity.z = bike.vz;
   player.speed = bike.speed;
   player.drifting = bike.drifting;

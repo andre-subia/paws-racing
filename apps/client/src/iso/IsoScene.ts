@@ -1,4 +1,4 @@
-import { type PlayerState, type RaceState, type TrackDef } from '@paws/shared';
+import { BIKE_GROUND_OFFSET, type PlayerState, type RaceState, type TrackDef } from '@paws/shared';
 import { Container, Text, TextStyle } from 'pixi.js';
 import type { Room } from 'colyseus.js';
 import type { InterpolatedPose, RemoteInterpolator } from '../net/interpolation.js';
@@ -128,21 +128,32 @@ export class IsoScene {
       }
       this.lastExplodedAt.set(player.id, player.explodedAt);
 
+      const groundY = this.deps.track.surfaceY + BIKE_GROUND_OFFSET;
       if (player.id === localSid && !localFinished) {
         if (phase === 'racing') {
           const s = prediction.getState();
-          view.update(s.x, s.z, s.yaw);
+          view.update(s.x, s.z, s.yaw, s.y - groundY);
           this.viewport.followTarget(s.x, s.z, dt);
           cameraSet = true;
         } else {
-          view.update(player.position.x, player.position.z, quatYaw(player.rotation));
+          view.update(
+            player.position.x,
+            player.position.z,
+            quatYaw(player.rotation),
+            player.position.y - groundY,
+          );
           this.viewport.followTarget(player.position.x, player.position.z, dt);
           cameraSet = true;
         }
       } else if (interpolator.sample(player.id, this.pose)) {
-        view.update(this.pose.x, this.pose.z, this.pose.yaw);
+        view.update(this.pose.x, this.pose.z, this.pose.yaw, this.pose.y - groundY);
       } else {
-        view.update(player.position.x, player.position.z, quatYaw(player.rotation));
+        view.update(
+          player.position.x,
+          player.position.z,
+          quatYaw(player.rotation),
+          player.position.y - groundY,
+        );
       }
     }
 

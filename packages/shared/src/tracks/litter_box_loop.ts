@@ -1,10 +1,5 @@
 import { MAX_PLAYERS_PER_ROOM } from '../constants.js';
-import type {
-  BoostPadDef,
-  CheckpointDef,
-  SpawnPoint,
-  TrackDef,
-} from '../track.js';
+import type { BoostPadDef, CheckpointDef, RampDef, SpawnPoint, TrackDef } from '../track.js';
 import { buildPolygonLoop, type Vec2 } from './polygon.js';
 
 /**
@@ -117,6 +112,30 @@ function buildBoostPads(): BoostPadDef[] {
   ];
 }
 
+function buildRamps(): RampDef[] {
+  const fwdX = built.startForward.x;
+  const fwdZ = built.startForward.z;
+  const idx = Math.floor(loop.length * 0.32);
+  const here = loop[idx]!;
+  const next = loop[(idx + 1) % loop.length]!;
+  return [
+    {
+      center: { x: built.startX + fwdX * 44, y: SURFACE_Y, z: built.startZ + fwdZ * 44 },
+      yaw: built.startYaw,
+      width: 7,
+      length: 6,
+      launch: 14,
+    },
+    {
+      center: { x: here.x, y: SURFACE_Y, z: here.z },
+      yaw: Math.atan2(-(next.x - here.x), -(next.z - here.z)),
+      width: 7,
+      length: 6,
+      launch: 14,
+    },
+  ];
+}
+
 export const litterBoxLoop: TrackDef = {
   id: 'litter_box_loop',
   name: 'Litter Box Loop',
@@ -126,4 +145,6 @@ export const litterBoxLoop: TrackDef = {
   spawnPoints: spawnPoints(),
   checkpoints: buildCheckpoints(),
   boostPads: buildBoostPads(),
+  ramps: buildRamps(),
+  gaps: [],
 };

@@ -44,6 +44,26 @@ export interface BoostPadDef {
   cooldown: number;
 }
 
+/** A launch ramp: crossing it at ground level flings the bike into the air. */
+export interface RampDef {
+  center: Vec3Lit;
+  /** Direction the ramp faces / launches along (radians, travel convention). */
+  yaw: number;
+  width: number;
+  length: number;
+  /** Upward launch velocity (m/s) applied on contact. */
+  launch: number;
+}
+
+/** A hole in the track surface — touching down inside one is fatal (you fall). */
+export interface GapDef {
+  center: Vec3Lit;
+  /** Orientation of the rectangular hole (radians, travel convention). */
+  yaw: number;
+  width: number;
+  length: number;
+}
+
 export interface TrackDef {
   id: string;
   name: string;
@@ -55,4 +75,8 @@ export interface TrackDef {
   spawnPoints: SpawnPoint[];
   checkpoints: CheckpointDef[];
   boostPads: BoostPadDef[];
+  /** Launch ramps that fling bikes into the air. May be empty. */
+  ramps: RampDef[];
+  /** Holes in the surface — landing in one is fatal. May be empty. */
+  gaps: GapDef[];
 }

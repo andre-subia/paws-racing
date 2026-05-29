@@ -2,6 +2,7 @@ import { MAX_PLAYERS_PER_ROOM } from '../constants.js';
 import type {
   BoostPadDef,
   CheckpointDef,
+  RampDef,
   SpawnPoint,
   TrackDef,
   Vec3Lit,
@@ -126,6 +127,25 @@ function buildBoostPads(): BoostPadDef[] {
   ];
 }
 
+function buildRamps(): RampDef[] {
+  return [
+    {
+      center: { x: STRAIGHT / 4, y: SURFACE_Y, z: -RADIUS },
+      yaw: -Math.PI / 2, // top straight, travelling +x
+      width: 9,
+      length: 7,
+      launch: 15,
+    },
+    {
+      center: { x: -STRAIGHT / 4, y: SURFACE_Y, z: +RADIUS },
+      yaw: Math.PI / 2, // bottom straight, travelling -x
+      width: 9,
+      length: 7,
+      launch: 15,
+    },
+  ];
+}
+
 export const catnipSpeedway: TrackDef = {
   id: 'catnip_speedway',
   name: 'Catnip Speedway',
@@ -135,4 +155,6 @@ export const catnipSpeedway: TrackDef = {
   spawnPoints: spawnPoints(),
   checkpoints: buildCheckpoints(),
   boostPads: buildBoostPads(),
+  ramps: buildRamps(),
+  gaps: [],
 };

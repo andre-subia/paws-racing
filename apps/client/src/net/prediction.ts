@@ -99,6 +99,7 @@ export class PredictionController {
       player.rotation.w,
     );
     this.bike.vx = player.velocity.x;
+    this.bike.vy = player.velocity.y;
     this.bike.vz = player.velocity.z;
     this.bike.speed = player.speed;
     this.bike.drifting = player.drifting;
